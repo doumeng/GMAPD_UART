@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python3 -c \"import pandas as pd; df = pd\\.read_excel\\('参考文档/APD焦平面BOOST电压设置表_SDR\\.xlsx', header=None\\); print\\(df\\.iloc\\[8:12\\]\\.to_string\\(\\)\\)\"$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
