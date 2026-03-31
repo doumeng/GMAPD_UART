@@ -1,0 +1,22 @@
+{
+    "useRK":"RK3576",
+    "xdmaDev":{
+        "dev0":{
+            "userBarSize":"128k",
+            "useEventNum":1,
+            "cpu":1
+        }
+    },
+    "xdmaVideo":{
+        "video0":{
+            "chn0":{
+                "说明":"暂无",
+                "width" :256,
+                "height":256,
+                "event":0,
+                "format":"yuv400",
+                "cpu":2
+            }
+        }
+    }
+}
