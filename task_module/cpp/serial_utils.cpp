@@ -96,4 +96,37 @@ namespace SerialUtils {
         return frame;
     }
 
+    void read_frame_by_boundary_async(serial_t* serial, uint8_t start_byte, uint8_t end_byte,
+                                      int timeout_ms, ReadCallback callback) {
+        if (!serial || !callback) {
+            if (callback) {
+                callback(false, std::vector<uint8_t>());
+            }
+            return;
+        }
+
+        // 创建一个分离的线程来执行异步读取
+        std::thread([serial, start_byte, end_byte, timeout_ms, callback]() {
+            auto result = read_frame_by_boundary(serial, start_byte, end_byte, timeout_ms);
+            bool success = !result.empty();
+            callback(success, result);
+        }).detach();
+    }
+
+    void read_fixed_length_async(serial_t* serial, size_t length, int timeout_ms, ReadCallback callback) {
+        if (!serial || length == 0 || !callback) {
+            if (callback) {
+                callback(false, std::vector<uint8_t>());
+            }
+            return;
+        }
+
+        // 创建一个分离的线程来执行异步读取
+        std::thread([serial, length, timeout_ms, callback]() {
+            auto result = read_fixed_length(serial, length, timeout_ms);
+            bool success = (result.size() == length);
+            callback(success, result);
+        }).detach();
+    }
+
 } // namespace SerialUtils

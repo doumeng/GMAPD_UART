@@ -182,10 +182,59 @@ namespace Cooler {
     }
 
     uint8_t setTargetTemp(uint16_t tempK) {
-        std::vector<uint8_t> params = {0x01}; 
+        std::vector<uint8_t> params = {0x01};
         uint16_t t_val = static_cast<uint16_t>(tempK);
         push_u16(params, t_val);
         return send_receive_cooler_cmd(static_cast<uint8_t>(CmdType::WRITE_CFG_PARAM), params);
+    }
+
+    void getCoolerTemperatureAsync(CoolerCallback callback) {
+        if (!callback) {
+            return;
+        }
+
+        // 在新线程中执行耗时的串口读取操作
+        std::thread([callback]() {
+            uint16_t temp = getCoolerTemperature();
+            bool success = (temp != 0);
+            callback(success, temp);
+        }).detach();
+    }
+
+    void startCoolerAsync(CoolerCallback callback) {
+        if (!callback) {
+            return;
+        }
+
+        std::thread([callback]() {
+            uint8_t result = startCooler();
+            bool success = (result != 0);
+            callback(success, result);
+        }).detach();
+    }
+
+    void stopCoolerAsync(CoolerCallback callback) {
+        if (!callback) {
+            return;
+        }
+
+        std::thread([callback]() {
+            uint8_t result = stopCooler();
+            bool success = (result != 0);
+            callback(success, result);
+        }).detach();
+    }
+
+    void setTargetTempAsync(uint16_t tempK, CoolerCallback callback) {
+        if (!callback) {
+            return;
+        }
+
+        std::thread([tempK, callback]() {
+            uint8_t result = setTargetTemp(tempK);
+            bool success = (result != 0);
+            callback(success, result);
+        }).detach();
     }
 
     void runInteractiveTest() {

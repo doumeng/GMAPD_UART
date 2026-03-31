@@ -1,0 +1,20 @@
+# Build directories
+build/
+binOutput/
+
+# Object files
+*.o
+*.obj
+*.a
+*.so
+
+# Temporary test files
+test_callback_compile.cpp
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+
+# System files
+.DS_Store
