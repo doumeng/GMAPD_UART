@@ -12,8 +12,12 @@
 #include <cstdint>
 #include <mutex>
 #include <string>
+#include <functional>
 
 namespace Cooler {
+
+    using CoolerCallback = std::function<void(bool success, uint8_t result)>;
+    using TemperatureCallback = std::function<void(bool success, uint16_t temperature)>;
 
     // 外部操作命令枚举
     enum class UserCmd {
@@ -36,6 +40,14 @@ namespace Cooler {
     uint8_t setTargetTemp(uint16_t tempK);    // 设置目标温度，单位K
     uint16_t getCoolerTemperature();          // 独立获取制冷机温度（冷头）
     
+    // 异步回调接口
+    void startCoolerAsync(CoolerCallback callback);
+    void stopCoolerAsync(CoolerCallback callback);
+    void clearErrorAsync(CoolerCallback callback);
+    void saveConfigAsync(CoolerCallback callback);
+    void setTargetTempAsync(uint16_t tempK, CoolerCallback callback);
+    void getCoolerTemperatureAsync(TemperatureCallback callback);
+
     // 交互式测试
     void runInteractiveTest();
 

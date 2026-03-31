@@ -271,4 +271,51 @@ namespace Cooler {
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
+    void startCoolerAsync(CoolerCallback callback) {
+        if (!callback) return;
+        std::thread([callback]() {
+            uint8_t res = startCooler();
+            callback(res != 0, res);
+        }).detach();
+    }
+
+    void stopCoolerAsync(CoolerCallback callback) {
+        if (!callback) return;
+        std::thread([callback]() {
+            uint8_t res = stopCooler();
+            callback(res != 0, res);
+        }).detach();
+    }
+
+    void clearErrorAsync(CoolerCallback callback) {
+        if (!callback) return;
+        std::thread([callback]() {
+            uint8_t res = clearError();
+            callback(res != 0, res);
+        }).detach();
+    }
+
+    void saveConfigAsync(CoolerCallback callback) {
+        if (!callback) return;
+        std::thread([callback]() {
+            uint8_t res = saveConfig();
+            callback(res != 0, res);
+        }).detach();
+    }
+
+    void setTargetTempAsync(uint16_t tempK, CoolerCallback callback) {
+        if (!callback) return;
+        std::thread([tempK, callback]() {
+            uint8_t res = setTargetTemp(tempK);
+            callback(res != 0, res);
+        }).detach();
+    }
+
+    void getCoolerTemperatureAsync(TemperatureCallback callback) {
+        if (!callback) return;
+        std::thread([callback]() {
+            uint16_t temp = getCoolerTemperature();
+            callback(temp != 0, temp);
+        }).detach();
+    }
 } // namespace Cooler

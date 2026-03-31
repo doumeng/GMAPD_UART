@@ -13,6 +13,9 @@
 #include "apd_control.h"
 #include "apd_voltage_table.h"
 #include "cooler_control.h"
+#include <atomic>
+
+std::atomic<uint16_t> g_cachedCoolerTemp{0};
 #include "preprocess_uart_protocol.h"
 #include "serial_utils.h"
 #include "task_reg.h"
@@ -517,23 +520,22 @@ namespace PreprocessUart {
                     const uint16_t tempRaw = static_cast<uint16_t>(cmd.paramLow) |
                                              (static_cast<uint16_t>(cmd.paramHigh) << 8);
                     
-                    gCmdStatus = Cooler::setTargetTemp(tempRaw); 
-
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to set cooler temperature!");
-                    } else {
-                        Logger::instance().info("Cooler temperature setting command executed successfully!");
-                    }
-
-                    usleep(50000);
-
-                    gCmdStatus = Cooler::saveConfig();
-
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to save temperature!");
-                    } else {
-                        Logger::instance().info("Cooler temperature save command executed successfully!");
-                    }
+                    Cooler::setTargetTempAsync(tempRaw, [](bool success, uint8_t) {
+                        if (!success) {
+                            Logger::instance().error("Failed to set cooler temperature!");
+                            gCmdStatus = 0;
+                        } else {
+                            Logger::instance().info("Cooler temperature setting command executed successfully!");
+                            std::thread([]() {
+                                usleep(50000);
+                                Cooler::saveConfigAsync([](bool succ2, uint8_t) {
+                                    gCmdStatus = succ2 ? 1 : 0;
+                                    if (!succ2) Logger::instance().error("Failed to save temperature!");
+                                    else Logger::instance().info("Cooler temperature save command executed successfully!");
+                                });
+                            }).detach();
+                        }
+                    });
 
                     std::string msg = "PreprocessUart CMD 0xC3 - 温度控制, 目标温度=" + std::to_string(tempRaw/10.f);
                     Logger::instance().info(msg.c_str());
@@ -585,13 +587,11 @@ namespace PreprocessUart {
                 {
                     Logger::instance().info("PreprocessUart CMD 0xC9 - 制冷机下电");
 
-                    gCmdStatus = Cooler::stopCooler();
-
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to stop cooler!");
-                    } else {
-                        Logger::instance().info("Cooler stop command executed successfully!");
-                    }
+                    Cooler::stopCoolerAsync([](bool success, uint8_t) {
+                        gCmdStatus = success ? 1 : 0;
+                        if (!success) Logger::instance().error("Failed to stop cooler!");
+                        else Logger::instance().info("Cooler stop command executed successfully!");
+                    });
                     
                     break;
                 }
@@ -635,13 +635,42 @@ namespace PreprocessUart {
 
         uint8_t pendingReplyCmd = 0;
         uint32_t txSequence = 1;
+        auto last_temp_req = std::chrono::steady_clock::now();
+        
+        std::atomic<bool> isReading{false};
+        std::vector<uint8_t> latestRxData;
+        std::mutex rxMutex;
 
         while (1) {
             auto startTime = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::milliseconds>(startTime - last_temp_req).count() > 500) {
+                last_temp_req = startTime;
+                Cooler::getCoolerTemperatureAsync([](bool success, uint16_t temp) {
+                    if (success) g_cachedCoolerTemp.store(temp);
+                });
+            }
 
-            // 1. 接收指令帧 (先收以提升响应实时性)
-            int readTimeout = std::max(1, periodMs - 10); // 留出一点余裕保证发送和状态机更新
-            std::vector<uint8_t> rxData = SerialUtils::read_fixed_length(serial, kFrameSize, readTimeout);
+            // 1. 接收指令帧 (异步处理，不阻塞主循环)
+            if (!isReading.exchange(true)) {
+                // 如果当前没有正在读取，则发起一次异步读取
+                SerialUtils::read_fixed_length_async(serial, kFrameSize, periodMs - 2, 
+                    [&isReading, &latestRxData, &rxMutex](bool success, const std::vector<uint8_t>& data) {
+                        if (success) {
+                            std::lock_guard<std::mutex> lock(rxMutex);
+                            latestRxData = data;
+                        }
+                        isReading = false;
+                    });
+            }
+
+            std::vector<uint8_t> rxData;
+            {
+                std::lock_guard<std::mutex> lock(rxMutex);
+                if (!latestRxData.empty()) {
+                    rxData = std::move(latestRxData);
+                    latestRxData.clear();
+                }
+            }
 
             if (rxData.size() == kFrameSize) {
                 std::array<uint8_t, kFrameSize> rxArray;
@@ -675,7 +704,7 @@ namespace PreprocessUart {
             uint8_t tempLow = 0, tempHigh = 0, voltLow = 0, voltHigh = 0;
 
             decodeVoltage(g_sysConfig.biasVoltage, voltLow, voltHigh);
-            uint16_t tempValue = Cooler::getCoolerTemperature();
+            uint16_t tempValue = g_cachedCoolerTemp.load();
             decodeTemperature(tempValue, tempLow, tempHigh);
 
             ReplyFrame reply = buildReplyFrame(txSequence++, cmdToReply, execResult.resp1, execResult.resp2, execResult.resp3, tempLow, tempHigh, voltLow, voltHigh); 

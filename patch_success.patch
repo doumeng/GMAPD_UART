@@ -1,0 +1,29 @@
+--- task_module/cpp/cooler_control.cpp
++++ task_module/cpp/cooler_control.cpp
+@@ -208,7 +208,7 @@
+ 
+         std::thread([callback]() {
+             uint8_t result = startCooler();
+-            bool success = (result != 0);
++            bool success = (result == 0);
+             callback(success, result);
+         }).detach();
+     }
+@@ -220,7 +220,7 @@
+ 
+         std::thread([callback]() {
+             uint8_t result = stopCooler();
+-            bool success = (result != 0);
++            bool success = (result == 0);
+             callback(success, result);
+         }).detach();
+     }
+@@ -232,7 +232,7 @@
+ 
+         std::thread([tempK, callback]() {
+             uint8_t result = setTargetTemp(tempK);
+-            bool success = (result != 0);
++            bool success = (result == 0);
+             callback(success, result);
+         }).detach();
+     }

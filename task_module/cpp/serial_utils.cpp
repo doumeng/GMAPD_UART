@@ -96,4 +96,22 @@ namespace SerialUtils {
         return frame;
     }
 
+    void read_frame_by_boundary_async(serial_t* serial, uint8_t start_byte, uint8_t end_byte, int timeout_ms, ReadCallback callback) {
+        if (!callback) return;
+        std::thread([serial, start_byte, end_byte, timeout_ms, callback]() {
+            std::vector<uint8_t> data = read_frame_by_boundary(serial, start_byte, end_byte, timeout_ms);
+            bool success = !data.empty() && data.front() == start_byte && data.back() == end_byte;
+            callback(success, data);
+        }).detach();
+    }
+
+    void read_fixed_length_async(serial_t* serial, size_t length, int timeout_ms, ReadCallback callback) {
+        if (!callback) return;
+        std::thread([serial, length, timeout_ms, callback]() {
+            std::vector<uint8_t> data = read_fixed_length(serial, length, timeout_ms);
+            bool success = (data.size() == length);
+            callback(success, data);
+        }).detach();
+    }
+
 } // namespace SerialUtils

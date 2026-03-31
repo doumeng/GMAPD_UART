@@ -1,0 +1,9 @@
+--- task_module/header/cooler_control.h
++++ task_module/header/cooler_control.h
+@@ -51,6 +51,7 @@
+     void startCoolerAsync(CoolerCallback callback);
+     void stopCoolerAsync(CoolerCallback callback);
+     void setTargetTempAsync(uint16_t tempK, CoolerCallback callback);
++    void saveConfigAsync(CoolerCallback callback);
+ 
+ } // namespace Cooler
