@@ -1,3 +1,0 @@
-/home/tcspc/code/GMAPD_UART/build/CMakeFiles/GMAPD_UART.dir
-/home/tcspc/code/GMAPD_UART/build/CMakeFiles/edit_cache.dir
-/home/tcspc/code/GMAPD_UART/build/CMakeFiles/rebuild_cache.dir
