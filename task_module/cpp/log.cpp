@@ -1,6 +1,10 @@
 #include "log.h"
 #include <iostream>
 #include <ctime>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
+#include <errno.h>
 
 std::unique_ptr<Logger> Logger::s_instance_ = nullptr;
 
@@ -24,7 +28,39 @@ void Logger::init(const std::string& filename) {
         // 已经初始化过，忽略
         return;
     }
-    s_instance_ = std::unique_ptr<Logger>(new Logger(filename));
+    
+    std::string outputDir = filename;
+    if (!outputDir.empty() && outputDir.back() != '/') {
+        outputDir += '/';
+    }
+
+    // 先尝试创建目录（如果不存在）
+    if (mkdir(outputDir.c_str(), 0777) == -1 && errno != EEXIST) {
+        std::cerr << "Logger: Failed to create output directory: " << outputDir << std::endl;
+    }
+
+    // 清空目录下的其他常规文件
+    DIR* dir = opendir(outputDir.c_str());
+    if (dir != nullptr) {
+        struct dirent* ent;
+        while ((ent = readdir(dir)) != nullptr) {
+            std::string fileName = ent->d_name;
+            if (fileName != "." && fileName != ".." && ent->d_type == DT_REG) {
+                std::string filePath = outputDir + fileName;
+                remove(filePath.c_str());
+            }
+        }
+        closedir(dir);
+    }
+
+    // 获取当前时间，生成唯一日志文件名
+    time_t now = time(nullptr);
+    struct tm* t = localtime(&now);
+    char timebuf[32];
+    strftime(timebuf, sizeof(timebuf), "%Y%m%d_%H%M%S", t);
+    std::string logFilePath = outputDir + "log_" + timebuf + ".txt";
+
+    s_instance_ = std::unique_ptr<Logger>(new Logger(logFilePath));
 }
 
 Logger& Logger::instance() {

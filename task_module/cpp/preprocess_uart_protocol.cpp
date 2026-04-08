@@ -13,24 +13,23 @@ namespace {
 
 constexpr std::size_t kHeaderStart = 0;
 constexpr std::size_t kHeaderEnd = 3;
-constexpr std::size_t kAddrIdx = 4;
-constexpr std::size_t kTypeIdx = 5;
-constexpr std::size_t kNumStart = 6;
-constexpr std::size_t kCmdIdx = 10;
-constexpr std::size_t kParamLowIdx = 11;
-constexpr std::size_t kParamHighIdx = 12;
-constexpr std::size_t kParamLastIdx = 13;
+
+constexpr std::size_t kSeqIdx = 4;
+constexpr std::size_t kApdBiasIdx = 6;
+constexpr std::size_t kCtlParaIdx = 8;
+constexpr std::size_t kAlgoFrameDenoiseIdx = 9;
+constexpr std::size_t kAlgoStrideDiffIdx = 10;
+constexpr std::size_t kAlgoKernalIdx = 11;
+constexpr std::size_t kPowerOnOffIdx = 12;
+constexpr std::size_t kDistanceIdx = 13;
+constexpr std::size_t kVelocityIdx = 15;
+constexpr std::size_t kTempCtlIdx = 17;
+
 constexpr std::size_t kFcsLowIdx = 26;
 constexpr std::size_t kFcsHighIdx = 27;
 constexpr std::size_t kTailStart = 28;
 constexpr std::size_t kTailEnd = 31;
 
-uint32_t readLe32(const uint8_t *p) {
-    return static_cast<uint32_t>(p[0]) |
-           (static_cast<uint32_t>(p[1]) << 8) |
-           (static_cast<uint32_t>(p[2]) << 16) |
-           (static_cast<uint32_t>(p[3]) << 24);
-}
 
 uint16_t readLe16(const uint8_t *p) {
     return static_cast<uint16_t>(p[0]) |
@@ -40,13 +39,6 @@ uint16_t readLe16(const uint8_t *p) {
 void writeLe16(uint8_t *p, uint16_t value) {
     p[0] = static_cast<uint8_t>(value & 0xFF);
     p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
-}
-
-void writeLe32(uint8_t *p, uint32_t value) {
-    p[0] = static_cast<uint8_t>(value & 0xFF);
-    p[1] = static_cast<uint8_t>((value >> 8) & 0xFF);
-    p[2] = static_cast<uint8_t>((value >> 16) & 0xFF);
-    p[3] = static_cast<uint8_t>((value >> 24) & 0xFF);
 }
 
 bool checkFlag(const std::array<uint8_t, kFrameSize> &raw,
@@ -71,7 +63,7 @@ uint16_t calcFcs16(const uint8_t *data, std::size_t len) {
 }
 
 uint16_t calcFrameFcs(const std::array<uint8_t, kFrameSize> &frame) {
-    return calcFcs16(frame.data() + kAddrIdx, 22);
+    return calcFcs16(frame.data() + 4, 22);
 }
 
 bool decodeCommandFrame(const std::array<uint8_t, kFrameSize> &raw,
@@ -91,20 +83,6 @@ bool decodeCommandFrame(const std::array<uint8_t, kFrameSize> &raw,
         return false;
     }
 
-    if (raw[kAddrIdx] != kAddr) {
-        if (reason != nullptr) {
-            *reason = "invalid address";
-        }
-        return false;
-    }
-
-    if (raw[kTypeIdx] != kType) {
-        if (reason != nullptr) {
-            *reason = "invalid type";
-        }
-        return false;
-    }
-
     const uint16_t rxFcs = readLe16(raw.data() + kFcsLowIdx);
     const uint16_t expectedFcs = calcFrameFcs(raw);
     if (rxFcs != expectedFcs) {
@@ -118,23 +96,29 @@ bool decodeCommandFrame(const std::array<uint8_t, kFrameSize> &raw,
     }
 
     out.raw = raw;
-    out.sequence = readLe32(raw.data() + kNumStart);
-    out.cmd = raw[kCmdIdx];
-    out.paramLow = raw[kParamLowIdx];
-    out.paramHigh = raw[kParamHighIdx];
-    out.paramLast = raw[kParamLastIdx];
+    out.sequence = readLe16(raw.data() + kSeqIdx);
+    out.apd_bias = readLe16(raw.data() + kApdBiasIdx);
+    out.ctl_para = raw[kCtlParaIdx];
+    out.algo_frame_denoise = raw[kAlgoFrameDenoiseIdx];
+    out.algo_stride_diff = raw[kAlgoStrideDiffIdx];
+    out.algo_kernal = raw[kAlgoKernalIdx];
+    out.power_on_off = raw[kPowerOnOffIdx];
+    out.distance = readLe16(raw.data() + kDistanceIdx);
+    out.velocity = readLe16(raw.data() + kVelocityIdx);
+    out.temp_ctl = readLe16(raw.data() + kTempCtlIdx);
     return true;
 }
 
-ReplyFrame buildReplyFrame(uint32_t sequence,
-                           uint8_t resultCmd,
-                           uint8_t resp1,
-                           uint8_t resp2,
-                           uint8_t resp3,
-                           uint8_t tempLow,
-                           uint8_t tempHigh,
-                           uint8_t voltLow,
-                           uint8_t voltHigh) {
+ReplyFrame buildReplyFrame(uint16_t sequence,
+                           uint8_t version,
+                           uint8_t apd_bias_status,
+                           uint8_t ctl_para_status,
+                           uint8_t algo_para_status,
+                           uint8_t power_status,
+                           uint8_t temp_low,
+                           uint8_t temp_high,
+                           uint8_t volt_int,
+                           uint8_t volt_frac) {
     ReplyFrame reply;
 
     for (std::size_t i = 0; i < kFrameSize; ++i) {
@@ -148,18 +132,19 @@ ReplyFrame buildReplyFrame(uint32_t sequence,
         reply.raw[i] = kFlagByte;
     }
 
-    reply.raw[kAddrIdx] = kAddr;
-    reply.raw[kTypeIdx] = kType;
-    writeLe32(reply.raw.data() + kNumStart, sequence);
-
-    reply.raw[kCmdIdx] = resultCmd;
-    reply.raw[kParamLowIdx] = resp1;
-    reply.raw[kParamHighIdx] = resp2;
-    reply.raw[13] = resp3;
-    reply.raw[15] = tempLow;
-    reply.raw[16] = tempHigh;
-    reply.raw[17] = voltLow;
-    reply.raw[18] = voltHigh;
+    writeLe16(reply.raw.data() + 4, sequence);
+    
+    reply.raw[6] = version;
+    
+    reply.raw[7] = apd_bias_status;
+    reply.raw[8] = ctl_para_status;
+    reply.raw[9] = algo_para_status;
+    reply.raw[10] = power_status;
+    
+    reply.raw[11] = temp_low;
+    reply.raw[12] = temp_high;
+    reply.raw[13] = volt_int;
+    reply.raw[14] = volt_frac;
 
     const uint16_t fcs = calcFrameFcs(reply.raw);
     writeLe16(reply.raw.data() + kFcsLowIdx, fcs);

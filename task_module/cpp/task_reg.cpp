@@ -38,7 +38,7 @@
 #include "uart_read.h"
 
 // UDP 发送器实例
-std::string ip_address = "192.168.73.111";
+std::string ip_address = "192.168.20.111";
 uint16_t udp_port = 10000;
 UdpComm::UdpSender udp_Sender(ip_address, udp_port);
 

@@ -114,7 +114,7 @@ int InitVoltageCtrl()
     return 0; // 初始化成功
 }
 
-// 先上5v 再上1.8v
+// 先上1.8v 再上5v
 int SecondVoltageCtrl()
 {   
     // 1.8v 二级电压控制
@@ -156,52 +156,22 @@ int HighVoltageCtrl(uint8_t voltage, uint8_t level)
     return 0;
 }
 
-// 电压控制函数，高压降到10v，关闭二级输出（依次关闭1.8v和5v）
+// 关闭二级输出
 int ShutdownVoltageCtrl()
 {   
-    // 1.8v 5v 一级控制；10v 高压控制
-    uint8_t  apdVal = 164;   
-    uint8_t  apdLevel = 0;
 
-    //高压到10V
-    if(apdLevelCtrl(apdLevel)<0){
-        return -1; // 设置电压级别失败
-    }
-    usleep(1000); // 硬件稳定时间  
-
-    if(apdEnCtrl(1)<0){
-        return -1; // 设置电压级别失败
-    }
-
-    if(apdVccCtrl((uint8_t *)&apdVal, sizeof(apdVal))<0){
-        return -1; // 设置电压级别失败
-    }
-    usleep(1000); // 硬件稳定时间    
-    
-    // 二级控制 先下1.8 再下5 
-    if(apdEnSecCtrl(0x7)<0){
+    // 二级控制 先下5V
+    if(apdEnSecCtrl(0x38)<0){
         return -1; // 禁能APD失败
     }
     usleep(1000); // 硬件稳定时间
 
-    // 先下1.8 再下5
+    // 再下1.8 
     if(apdEnSecCtrl(0x0)<0){
         return -1; // 禁能APD失败
     }
     usleep(1000); // 硬件稳定时间
 
-    // // 一级控制 先下1.8 再下5 
-    // if(vcc1v8FirstCtrl(0)<0){
-    //     return -1; // 设置电压级别失败
-    // }
-
-    // usleep(1000); // 硬件稳定时间
-    // //enb apd 使能
-    // if(vcc5VFirstCtrl(0)<0){
-    //     return -1; // 设置电压级别失败
-    // }
-    
-    // usleep(1000); // 硬件稳定时间
     return 0;
 }
 

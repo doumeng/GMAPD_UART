@@ -84,7 +84,7 @@ namespace Cooler {
             snprintf(buf, sizeof(buf), "%02X ", b);
             frame_str += buf;
         }
-        Logger::instance().info(("Sent command to cooler: " + frame_str).c_str());
+        Logger::instance().debug(("Sent command to cooler: " + frame_str).c_str());
         
         // 500ms 超时接收
         auto rx_frame = SerialUtils::read_frame_by_boundary(g_serial, START_BYTE, END_BYTE, 50);
@@ -100,7 +100,7 @@ namespace Cooler {
             snprintf(buf, sizeof(buf), "%02X ", b);
             rx_frame_str += buf;
         }
-        Logger::instance().info(("Received response from cooler: " + rx_frame_str).c_str());
+        Logger::instance().debug(("Received response from cooler: " + rx_frame_str).c_str());
         
         uint8_t rx_cmd_code;
         std::vector<uint8_t> rx_params;

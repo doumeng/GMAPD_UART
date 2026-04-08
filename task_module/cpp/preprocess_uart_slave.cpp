@@ -71,13 +71,12 @@ namespace PreprocessUart {
                 case ApdPowerState::STARTING_1V8_5V:
                     if (elapsedMs >= 100) {
                         Logger::instance().info("PreprocessUart APD Start: Stage 30V");
-                        
-                        ApdGatherEn(1);
-                        usleep(1000000); // 100ms 延时，确保电压稳定
 
                         SecondVoltageCtrl();
                         
-                        usleep(1000000); // 100ms 延时，确保电压稳定
+                        usleep(10000000); // 100ms 延时，确保电压稳定
+
+                        ApdGatherEn(1);
 
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::STARTING_30V;
@@ -93,7 +92,7 @@ namespace PreprocessUart {
                         float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(30, spiValue, levelValue);
                         
                         std::ostringstream msg;
-                        msg << "PreprocessUart CMD 0xC7 - APD偏压设置, 请求电压=" << 30
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 30
                             << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
@@ -117,7 +116,7 @@ namespace PreprocessUart {
                         float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(50, spiValue, levelValue);
                         
                         std::ostringstream msg;
-                        msg << "PreprocessUart CMD 0xC7 - APD偏压设置, 请求电压=" << 50
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 50
                             << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
@@ -140,7 +139,7 @@ namespace PreprocessUart {
                         float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(55, spiValue, levelValue);
                         
                         std::ostringstream msg;
-                        msg << "PreprocessUart CMD 0xC7 - APD偏压设置, 请求电压=" << 55
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 55
                             << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
@@ -159,21 +158,21 @@ namespace PreprocessUart {
                     if (elapsedMs >= 100) {
                         Logger::instance().info("PreprocessUart APD Start: Stage 58V check");
 
-                        // uint16_t spiValue = 0;
-                        // uint8_t levelValue = 0;
-                        // float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(58, spiValue, levelValue);
+                        uint16_t spiValue = 0;
+                        uint8_t levelValue = 0;
+                        float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(58, spiValue, levelValue);
                         
-                        // std::ostringstream msg;
-                        // msg << "PreprocessUart CMD 0xC7 - APD偏压设置, 请求电压=" << 58
-                        //     << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
-                        //     << ", Level=" << static_cast<int>(levelValue);
-                        // Logger::instance().info(msg.str().c_str());
+                        std::ostringstream msg;
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 58
+                            << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
+                            << ", Level=" << static_cast<int>(levelValue);
+                        Logger::instance().info(msg.str().c_str());
 
-                        // {
-                        //     HighVoltageCtrl(spiValue, levelValue);
-                        //     usleep(1000000); // 1s 延时，确保电压稳定
-                        //     g_sysConfig.biasVoltage = 58.0f;
-                        // }
+                        {
+                            HighVoltageCtrl(spiValue, levelValue);
+                            usleep(1000000); // 1s 延时，确保电压稳定
+                            g_sysConfig.biasVoltage = 58.0f;
+                        }
 
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::STARTING_SUCCESS;
@@ -190,7 +189,7 @@ namespace PreprocessUart {
                         float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(50, spiValue, levelValue);
                         
                         std::ostringstream msg;
-                        msg << "PreprocessUart CMD 0xC8 - APD偏压设置, 请求电压=" << 50
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 50
                             << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
@@ -214,7 +213,7 @@ namespace PreprocessUart {
                         float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(30, spiValue, levelValue);
                         
                         std::ostringstream msg;
-                        msg << "PreprocessUart CMD 0xC8 - APD偏压设置, 请求电压=" << 30
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 30
                             << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
@@ -238,7 +237,7 @@ namespace PreprocessUart {
                         float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(10, spiValue, levelValue);
                         
                         std::ostringstream msg;
-                        msg << "PreprocessUart CMD 0xC8 - APD偏压设置, 请求电压=" << 10
+                        msg << "PreprocessUart CMD - APD偏压设置, 请求电压=" << 10
                             << "V, 匹配表电压=" << matchedVol << "V, SPI值=" << spiValue 
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
@@ -261,20 +260,16 @@ namespace PreprocessUart {
             }
         }
         
-        // 处理0xC1命令 一个生成版本号的函数，输入年月日，输出一个3个字节的版本号，第一个字节为年份的后两位，第二个字节为月份，第三个字节为日期
-        uint32_t generateVersionNumber(int year, int month, int day) {
-            uint32_t version = 0;
-            version |= (year % 100) << 16; // 年份的后两位放在高字节
-            version |= (month & 0xFF) << 8;   // 月份放在中间字节
-            version |= (day & 0xFF);         // 日期放在低字节
-            return version;
+        // 生成1字节版本号：高四位为大版本，低四位为小版本
+        uint8_t generateVersionNumber(uint8_t major, uint8_t minor) {
+            return (major << 4) | (minor & 0x0F);
         }
 
-        // 处理0xC4命令，设置APD状态，paramLow的低3位分别表示触发方式、测试点使能和输出数据通道
-        uint8_t ApdStateSetting(const CommandFrame &cmd){
-            uint8_t triggerMode = cmd.paramLow & 0x01; // 低3位
-            uint8_t testPoint = (cmd.paramLow >> 1) & 0x01; // 第2位
-            uint8_t outputMode = (cmd.paramLow >> 2) & 0x01; // 其余6位
+        // 处理控制参数 (原0xC4功能)
+        uint8_t ApdStateSetting(uint8_t ctl_para) {
+            uint8_t triggerMode = ctl_para & 0x01; // 低1位
+            uint8_t testPoint = (ctl_para >> 1) & 0x01; // 第2位
+            uint8_t outputMode = (ctl_para >> 2) & 0x01; // 其余6位
 
             if (triggerMode == 0) {
                 // 外触发
@@ -335,16 +330,16 @@ namespace PreprocessUart {
             return 0;
         }
 
-        // 处理0xC5命令，设置算法参数，paramLow的低4位表示构建帧数，高4位表示降噪等级；paramHigh的低4位表示步长，高4位表示差分阈值；paramLast表示卷积核大小
-        uint8_t AlgoParaSetting(const CommandFrame &cmd){
+        // 处理算法参数 (原0xC5功能)
+        uint8_t AlgoParaSetting(uint8_t algo_frame_denoise, uint8_t algo_stride_diff, uint8_t algo_kernal) {
             int status = 0;
-            uint8_t constructFrame = cmd.paramLow & 0x0F; // 低4位
-            uint8_t denoiseLevel = (cmd.paramLow >> 4) & 0x0F; // 高4位
+            uint8_t constructFrame = algo_frame_denoise & 0x0F; // 低4位
+            uint8_t denoiseLevel = (algo_frame_denoise >> 4) & 0x0F; // 高4位
 
-            uint8_t strideLength = cmd.paramHigh & 0x0F; // 低4位
-            uint8_t diffThreshold = (cmd.paramHigh >> 4) & 0x0F; // 高4位
+            uint8_t strideLength = algo_stride_diff & 0x0F; // 低4位
+            uint8_t diffThreshold = (algo_stride_diff >> 4) & 0x0F; // 高4位
 
-            uint8_t kernalSize = cmd.paramLast;
+            uint8_t kernalSize = algo_kernal;
 
             g_histConfig.stride = strideLength;
             g_histConfig.threshold = diffThreshold;
@@ -378,246 +373,150 @@ namespace PreprocessUart {
             return status;
         }
 
-        // 处理0xC6命令，设置延迟，paramLow和paramHigh组合成一个16位的延迟值，单位为毫秒
-        uint8_t DelaySetting(const CommandFrame &cmd){
-            uint16_t distance = static_cast<uint16_t>(cmd.paramLow) |  (static_cast<uint16_t>(cmd.paramHigh) << 8);
-            uint16_t speed = static_cast<uint16_t>(cmd.paramLow) |  (static_cast<uint16_t>(cmd.paramHigh) << 8);
-            
+        // 处理延迟设置 (原0xC6功能)
+        uint8_t DelaySetting(uint16_t distance) {
             int delay = ComputeDelay(distance, 2, 1000);
 
-            Logger::instance().info(("PreprocessUart CMD 0xC6 - Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
+            Logger::instance().info(("PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
 
             EnDelayCtrl(delay);
             RecDelayCtrl(delay + 1);
             return 0;
         }
 
-        CmdResponse getResponseExecutionResult(uint8_t cmd) {
-            CmdResponse res;
-            if (cmd == 0xC1) {
-                uint32_t version = generateVersionNumber(2026, 3, 19);
-                res.resp1 = (version >> 16) & 0xFF; // Year
-                res.resp2 = (version >> 8) & 0xFF;  // Month
-                res.resp3 = version & 0xFF;         // Day
+        struct PreprocessStateCache {
+            uint16_t apd_bias = 0;
+            uint8_t ctl_para = 0;
+            uint8_t algo_frame_denoise = 0;
+            uint8_t algo_stride_diff = 0;
+            uint8_t algo_kernal = 0;
+            uint8_t power_on_off = 0;
+            uint8_t last_received_power_on_off = 0xFF;
+            int power_on_off_count = 0;
+            uint16_t distance = 0;
+            uint16_t velocity = 0;
+            uint16_t temp_ctl = 0;
+        };
 
-                // ApdGatherEn(1);
+        PreprocessStateCache g_stateCache;
+        uint8_t g_apd_bias_status = 0;
+        uint8_t g_ctl_para_status = 0;
+        uint8_t g_algo_para_status = 0;
+        uint8_t g_power_status = 0;
 
-                return res;
-            }
-            else if (cmd == 0xC2) {
-                if (gCmdStatus > 0) {
-                    res.resp1 = 0x00; 
+        void handleFullStateFrame(const CommandFrame &cmd) {
+            // 1. APD上下电与制冷机控制 (power_on_off 字节13)  D0: 制冷机(1开/0关), D1: APD探测器(1下电/0上电)
+            if (cmd.power_on_off != g_stateCache.power_on_off) {
+                if (cmd.power_on_off == g_stateCache.last_received_power_on_off) {
+                    g_stateCache.power_on_off_count++;
                 } else {
-                    res.resp1 = 0x01; 
+                    g_stateCache.last_received_power_on_off = cmd.power_on_off;
+                    g_stateCache.power_on_off_count = 1;
                 }
 
-                return res; 
-            }
-            else if (cmd == 0xC3)
-            {
-                if (gCmdStatus > 0) {
-                    res.resp1 = 0x00; // D7=1 执行成功
-                } else {
-                    res.resp1 = 0x01; // D6=1 执行失败
-                }
-                return res; 
-            }
-            else if (cmd == 0xC4)
-            {
-                if (gCmdStatus == 0) {
-                    res.resp1 = 0x00; // D7=1 执行成功
-                } else {
-                    res.resp1 = 0x01; // D6=1 执行失败
-                }
+                if (g_stateCache.power_on_off_count >= 3) {
+                    uint8_t cooler_cmd = cmd.power_on_off & 0x01;
+                    uint8_t apd_power_cmd = (cmd.power_on_off >> 1) & 0x01;
+                    
+                    uint8_t last_cooler_cmd = g_stateCache.power_on_off == 0xFF ? 0xFF : (g_stateCache.power_on_off & 0x01);
+                    uint8_t last_apd_power_cmd = g_stateCache.power_on_off == 0xFF ? 0xFF : ((g_stateCache.power_on_off >> 1) & 0x01);
 
-                return res; 
-            }
-            else if (cmd == 0xC5)
-            {
-                if (gCmdStatus == 0) {
-                    res.resp1 = 0x00; // D7=1 执行成功
-                } else {
-                    res.resp1 = 0x01; // D6=1 执行失败
-                }
-
-                return res; 
-            }
-            else if (cmd == 0xC6)
-            {
-                if (gCmdStatus == 0) {
-                    res.resp1 = 0x00; // D7=1 执行成功
-                } else {
-                    res.resp1 = 0x01; // D6=1 执行失败
-                }
-
-                return res; 
-            }
-            else if (cmd == 0xC7) {
-                if (currentApdState >= ApdPowerState::STARTING_1V8_5V && currentApdState <= ApdPowerState::STARTING_58V) {
-                    res.resp1 = 0x40; // D6=1 上电中
-                    return res;
-                } else if (currentApdState == ApdPowerState::STARTING_SUCCESS) {
-                    // 也可根据硬件实际检查返回 0x20 (失败)
-                    res.resp1 = 0x80; // D7=1 上电成功
-                    return res;
-                }
-                return res; 
-            } 
-            else if (cmd == 0xC8) {
-                if (currentApdState >= ApdPowerState::SHUTDOWN_50V && currentApdState <= ApdPowerState::SHUTDOWN_30V) {
-                    res.resp1 = 0x40; 
-                    return res;
-                } else if (currentApdState == ApdPowerState::SHUTDOWN_SUCCESS) {
-                    res.resp1 = 0x80; 
-                    return res;
-                }
-                return res;
-            }
-            else if (cmd == 0xC9) {
-                if (gCmdStatus > 0) {
-                    res.resp1 = 0x00; 
-                } else {
-                    res.resp1 = 0x01; 
-                }
-                return res;
-            }
-            else if (cmd == 0xCA) {
-                if (gCmdStatus == 0) {
-                    res.resp1 = 0x00; 
-                } else {
-                    res.resp1 = 0x01; 
-                }
-                return res;
-            }
-            return res; 
-        }
-
-        void handleCommandTrigger(const CommandFrame &cmd) {
-            switch (cmd.cmd) {
-                case 0xC1:
-                    Logger::instance().info("PreprocessUart CMD 0xC1 - 组件编号读取");
-                    break;
-                case 0xC2: 
-                {
-                    Logger::instance().info("PreprocessUart CMD 0xC2 - 制冷机上电");
-
-                    gCmdStatus = Cooler::startCooler();
-
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to start cooler!");
-                    } else {
-                        Logger::instance().info("Cooler start command executed successfully!");
+                    if (cooler_cmd != last_cooler_cmd) {
+                        if (cooler_cmd == 1) {
+                            Logger::instance().info("PreprocessUart - 制冷机上电 (已确认3次)");
+                            if (Cooler::startCooler() == 0) {
+                                g_power_status |= 0x01; // D0=1 失败
+                            } else {
+                                g_power_status &= ~0x01; // D0=0 成功
+                            }
+                        } else {
+                            Logger::instance().info("PreprocessUart - 制冷机下电 (已确认3次)");
+                            if (Cooler::stopCooler() == 0) {
+                                g_power_status |= 0x01;
+                            } else {
+                                g_power_status &= ~0x01; 
+                            }
+                        }
                     }
 
-                    break;
+                    if (apd_power_cmd != last_apd_power_cmd) {
+                        if (apd_power_cmd == 1) {
+                            Logger::instance().info("PreprocessUart - APD启动状态机 (已确认3次)");
+                            activeMachineCmd = 0xC7; // 复用状态机标志
+                            currentApdState = ApdPowerState::STARTING_1V8_5V;
+                            lastApdStateTime = std::chrono::steady_clock::now();
+                            g_power_status &= ~0x02; // 0 APD上电
+                        } else {
+                            Logger::instance().info("PreprocessUart - 探测器下电状态机 (已确认3次)");
+                            activeMachineCmd = 0xC8;
+                            currentApdState = ApdPowerState::SHUTDOWN_50V;
+                            lastApdStateTime = std::chrono::steady_clock::now();
+                            g_power_status |= 0x02; // 1 APD下电
+                        }
+                    }
+                    
+                    g_stateCache.power_on_off = cmd.power_on_off;
+                    g_stateCache.power_on_off_count = 0; // 执行后重置计数
+                }
+            } else {
+                g_stateCache.power_on_off_count = 0; // 状态如果已经一致则重置计数
+                g_stateCache.last_received_power_on_off = cmd.power_on_off;
+            }
+
+            // 2. APD 偏压状态 (apd_bias 字节7-8)
+            if (cmd.apd_bias != g_stateCache.apd_bias) {
+                float targetVoltage = static_cast<float>(cmd.apd_bias & 0xFF) + (static_cast<float>(cmd.apd_bias >> 8) / 10.0f);
+                uint16_t spiValue = 0;
+                uint8_t levelValue = 0;
+                float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(targetVoltage, spiValue, levelValue);
                 
+                Logger::instance().info(("PreprocessUart - APD偏压设置, 请求=" + std::to_string(targetVoltage) + "V").c_str());
+                
+                if (HighVoltageCtrl(spiValue, levelValue) == 0) {
+                    g_apd_bias_status = 0; // 0x0 成功
+                } else {
+                    g_apd_bias_status = 1; // 0x1 失败
                 }
-                case 0xC3: 
-                {
-                    const uint16_t tempRaw = static_cast<uint16_t>(cmd.paramLow) |
-                                             (static_cast<uint16_t>(cmd.paramHigh) << 8);
-                    
-                    gCmdStatus = Cooler::setTargetTemp(tempRaw); 
+                g_sysConfig.biasVoltage = targetVoltage;
+                g_stateCache.apd_bias = cmd.apd_bias;
+            }
 
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to set cooler temperature!");
-                    } else {
-                        Logger::instance().info("Cooler temperature setting command executed successfully!");
-                    }
+            // 3. APD控制参数 (ctl_para 字节9)
+            if (cmd.ctl_para != g_stateCache.ctl_para) {
+                Logger::instance().info("PreprocessUart - APD控制参数设置");
+                g_ctl_para_status = ApdStateSetting(cmd.ctl_para); 
+                g_stateCache.ctl_para = cmd.ctl_para;
+            }
 
+            // 4. 算法参数 (字节10-12)
+            if (cmd.algo_frame_denoise != g_stateCache.algo_frame_denoise || 
+                cmd.algo_stride_diff != g_stateCache.algo_stride_diff || 
+                cmd.algo_kernal != g_stateCache.algo_kernal) {
+                
+                Logger::instance().info("PreprocessUart - 算法参数配置");
+                g_algo_para_status = AlgoParaSetting(cmd.algo_frame_denoise, cmd.algo_stride_diff, cmd.algo_kernal);
+
+                g_stateCache.algo_frame_denoise = cmd.algo_frame_denoise;
+                g_stateCache.algo_stride_diff = cmd.algo_stride_diff;
+                g_stateCache.algo_kernal = cmd.algo_kernal;
+            }
+
+            // 5. 延迟设置 (弹目距离 字节14-15)
+            if (cmd.distance != g_stateCache.distance) {
+                Logger::instance().info("PreprocessUart - 弹目距离发送");
+                DelaySetting(cmd.distance);
+                g_stateCache.distance = cmd.distance;
+            }
+
+            // 6. 温度控制 (temp_ctl 字节18)
+            if (cmd.temp_ctl != g_stateCache.temp_ctl) {
+                Logger::instance().info(("PreprocessUart - 温度控制，目标=" + std::to_string(cmd.temp_ctl)).c_str());
+                uint16_t tempRaw = static_cast<uint16_t>(cmd.temp_ctl) * 10; // Cooler期待K为单位
+                if (Cooler::setTargetTemp(tempRaw) != 0) {
                     usleep(50000);
-
-                    gCmdStatus = Cooler::saveConfig();
-
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to save temperature!");
-                    } else {
-                        Logger::instance().info("Cooler temperature save command executed successfully!");
-                    }
-
-                    std::string msg = "PreprocessUart CMD 0xC3 - 温度控制, 目标温度=" + std::to_string(tempRaw/10.f);
-                    Logger::instance().info(msg.c_str());
-                    
-                    break;
+                    Cooler::saveConfig();
                 }
-                case 0xC4: 
-                {
-                    gCmdStatus = ApdStateSetting(cmd);
-
-                    std::string msg = "PreprocessUart CMD 0xC4:"+  std::to_string(cmd.paramLow) + std::string((gCmdStatus == 0) ? " 执行成功" : " 执行失败");
-                    Logger::instance().info(msg.c_str());
-                    break;
-                }
-                case 0xC5: 
-                {
-                    gCmdStatus = AlgoParaSetting(cmd);
-
-                    std::string msg = "PreprocessUart CMD 0xC5 - 算法参数配置, byte12=0x" + byteToHex(cmd.paramLow) +
-                                      ", byte13=0x" + byteToHex(cmd.paramHigh);
-                    Logger::instance().info(msg.c_str());
-                    break;
-                }
-                case 0xC6: 
-                {
-                    const uint16_t distance = static_cast<uint16_t>(cmd.paramLow) |  (static_cast<uint16_t>(cmd.paramHigh) << 8);
-                    gCmdStatus = DelaySetting(cmd);
-                    std::string msg = "PreprocessUart CMD 0xC6 - 弹体信息发送, 距离字段=" + std::to_string(distance);
-                    Logger::instance().info(msg.c_str());
-                    break;
-                }
-                case 0xC7:
-                {
-                    Logger::instance().info("PreprocessUart CMD 0xC7 - APD启动 [State Machine Initiated, Stage 1.8V, 5V]");
-                    activeMachineCmd = 0xC7;
-                    currentApdState = ApdPowerState::STARTING_1V8_5V;
-                    lastApdStateTime = std::chrono::steady_clock::now();
-                    break;
-                }
-                case 0xC8:
-                {
-                    Logger::instance().info("PreprocessUart CMD 0xC8 - 探测器下电 [State Machine Initiated, Stage -5V]");
-                    activeMachineCmd = 0xC8;
-                    currentApdState = ApdPowerState::SHUTDOWN_50V;
-                    lastApdStateTime = std::chrono::steady_clock::now();
-                    break;
-                }
-                case 0xC9: 
-                {
-                    Logger::instance().info("PreprocessUart CMD 0xC9 - 制冷机下电");
-
-                    gCmdStatus = Cooler::stopCooler();
-
-                    if (gCmdStatus == 0) {
-                        Logger::instance().error("Failed to stop cooler!");
-                    } else {
-                        Logger::instance().info("Cooler stop command executed successfully!");
-                    }
-                    
-                    break;
-                }
-                case 0xCA: 
-                {
-                    // 通讯协议要求：12 字节表示整数位，13 字节表示小数位，例如 60.9V，12 字节表示 60, 13 字节表示 9
-                    float targetVoltage = static_cast<float>(cmd.paramLow) + (static_cast<float>(cmd.paramHigh) / 10.0f);
-                    
-                    uint16_t spiValue = 0;
-                    uint8_t levelValue = 0;
-                    float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(targetVoltage, spiValue, levelValue);
-                    std::string msg = "PreprocessUart CMD 0xCA - APD偏压设置, 请求电压=" + std::to_string(targetVoltage) 
-                        + "V, 匹配表电压=" + std::to_string(matchedVol) + "V, SPI值=" + std::to_string(spiValue) 
-                        + ", Level=" + std::to_string(static_cast<int>(levelValue));
-
-                    gCmdStatus = HighVoltageCtrl(spiValue, levelValue); // 直接设置到 20V，跳过中间阶段
-                    
-                    g_sysConfig.biasVoltage = targetVoltage;
-                    
-                    Logger::instance().info(msg.c_str());
-                    
-                    break;
-                }
-                default:
-                    Logger::instance().info(("PreprocessUart 收到未知指令: 0x" + byteToHex(cmd.cmd)).c_str());
-                    break;
+                g_stateCache.temp_ctl = cmd.temp_ctl;
             }
         }
     } // namespace
@@ -633,7 +532,6 @@ namespace PreprocessUart {
             return;
         }
 
-        uint8_t pendingReplyCmd = 0;
         uint32_t txSequence = 1;
 
         while (1) {
@@ -646,13 +544,12 @@ namespace PreprocessUart {
             if (rxData.size() == kFrameSize) {
                 std::array<uint8_t, kFrameSize> rxArray;
                 std::copy(rxData.begin(), rxData.end(), rxArray.begin());
-                Logger::instance().debug(("PreprocessUart Received frame: " + frameToHex(rxArray)).c_str());
+                Logger::instance().info(("PreprocessUart Received frame: " + frameToHex(rxArray)).c_str());
 
                 CommandFrame cmdFrame;
                 std::string reason;
                 if (decodeCommandFrame(rxArray, cmdFrame, &reason)) {
-                    handleCommandTrigger(cmdFrame);
-                    pendingReplyCmd = cmdFrame.cmd; // 缓存供本阶段及后续应答
+                    handleFullStateFrame(cmdFrame);
                 } else {
                     Logger::instance().warning(("PreprocessUart Invalid frame: " + reason).c_str());
                 }
@@ -661,27 +558,38 @@ namespace PreprocessUart {
             // 2. Update state machine
             processApdStateMachine();
 
-            // 3. 发送周期应答（优先使用正在运行的长耗时状态机指令，如果无则使用最后一次的指令CMD，再无则为0）
-            uint8_t cmdToReply = (activeMachineCmd != 0) ? activeMachineCmd : pendingReplyCmd;
-            
-            CmdResponse execResult;
-            if (cmdToReply != 0) {
-                execResult = getResponseExecutionResult(cmdToReply);
-                Logger::instance().info(("PreprocessUart Preparing reply for CMD 0x" + byteToHex(cmdToReply)).c_str());
-            }
-
-            // 获取电压及温度，根据电压值和读取温敏电阻并解析；
+            // 3. 发送周期应答，获取电压及温度，根据电压值和读取温敏电阻并解析；
 
             uint8_t tempLow = 0, tempHigh = 0, voltLow = 0, voltHigh = 0;
 
             decodeVoltage(g_sysConfig.biasVoltage, voltLow, voltHigh);
+
             uint16_t tempValue = Cooler::getCoolerTemperature();
             decodeTemperature(tempValue, tempLow, tempHigh);
+            Logger::instance().debug(("PreprocessUart Cooler Temperature: " + std::to_string(static_cast<float>(tempValue) / 10.0f) + "K").c_str());
+            
+            // 版本号固定下发：高四位大版本，低四位小版本
+            uint8_t major_version = 1;
+            uint8_t minor_version = 0;
+            uint8_t version = generateVersionNumber(major_version, minor_version);
 
-            ReplyFrame reply = buildReplyFrame(txSequence++, cmdToReply, execResult.resp1, execResult.resp2, execResult.resp3, tempLow, tempHigh, voltLow, voltHigh); 
+            uint8_t current_power_status = g_power_status;
+            
+            if (currentApdState >= ApdPowerState::STARTING_1V8_5V && currentApdState <= ApdPowerState::STARTING_58V) {
+                current_power_status &= ~0x02; // 启动中对应下电标记清除
+            }
+
+            ReplyFrame reply = buildReplyFrame(txSequence++, 
+                                               version, 
+                                               g_apd_bias_status, 
+                                               g_ctl_para_status, 
+                                               g_algo_para_status, 
+                                               current_power_status, 
+                                               tempLow, tempHigh, 
+                                               voltLow, voltHigh);
             std::vector<uint8_t> txData(reply.raw.begin(), reply.raw.end());
             
-            Logger::instance().debug(("PreprocessUart Sending reply frame: " + frameToHex(reply.raw)).c_str());
+            Logger::instance().info(("PreprocessUart Sending reply frame: " + frameToHex(reply.raw)).c_str());
            
             SerialUtils::write_frame(serial, txData);
 

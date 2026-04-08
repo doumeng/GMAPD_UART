@@ -9,7 +9,7 @@ int apdLevelCtrl(uint8_t cmd);
 
 int apdEnCtrl(uint8_t enb);
 
-int apdEnSecCtrl(uint8_t cmd);
+int apdEnSecCtrl(uint8_t cmd); // 000 1.8V 000 5V
 
 int vcc1v8FirstCtrl(uint8_t enb);
 
