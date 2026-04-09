@@ -12,7 +12,6 @@
 #include <iostream>
 #include <cmath>
 
-// 3. 本项目其他头文件
 #include "cooler_protocol.h"
 #include "log.h"
 #include "serial.h"
@@ -86,9 +85,8 @@ namespace Cooler {
         }
         Logger::instance().debug(("Sent command to cooler: " + frame_str).c_str());
         
-        // 500ms 超时接收
+        // 50ms 超时接收
         auto rx_frame = SerialUtils::read_frame_by_boundary(g_serial, START_BYTE, END_BYTE, 50);
-        // auto rx_frame = SerialUtils::read_fixed_length(g_serial, 8, 500);
         if (rx_frame.empty()) {
             Logger::instance().error("Cooler command timeout!");
             return 0;
@@ -131,8 +129,7 @@ namespace Cooler {
         }
         Logger::instance().debug(("Sent command to cooler: " + frame_str).c_str());
         
-
-        // 500ms 超时接收
+        // 50ms 超时接收
         auto rx_frame = SerialUtils::read_frame_by_boundary(g_serial, START_BYTE, END_BYTE, 50);
         if (rx_frame.empty()) {
             Logger::instance().error("Read cooler temperature timeout!");

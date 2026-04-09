@@ -22,6 +22,7 @@ struct UdpDataPacket {
     std::vector<float> dist;
     std::vector<uint16_t> inten;
     std::vector<int32_t> raw; 
+    
     int rows;
     int cols;
 };

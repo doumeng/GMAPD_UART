@@ -8,6 +8,7 @@
  */
 
 #include "tof_process.h"
+#include "apd_control.h"
 
 namespace TofProcesser {
     // // 计算直方图并返回统计结果 (支持14位图像)
@@ -50,28 +51,23 @@ namespace TofProcesser {
 
     void thread_ComputeDistance()
     {
-        constexpr auto kComputeInterval = std::chrono::milliseconds(20); // 模拟1秒读取一次
-
-        constexpr size_t kMaxTofFrameCount = 200;
-        u_char *src = new u_char[kMaxTofFrameCount * 16384 * 2];
+        constexpr auto kComputeInterval = std::chrono::milliseconds(1000); // 模拟1秒读取一次
 
         while (1)
         {
             auto computationStart = std::chrono::steady_clock::now();
 
-#if 0
-            // TODO:MIPI接口读取数据
             if (g_sysConfig.workMode == UartComm::WorkMode::TEST)
             {
-                img::ImgMod depthImg = img::imgRead(depthImgChnAttr);
+                img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
 
-                if(depthImg.isEmptyFrame()){
-                    Logger::instance().debug("Thread tof process - Failed to read point cloud from mipi");
+                if(tofImg.isEmptyFrame()){
+                    Logger::instance().info("Thread tof process - Failed to read point cloud from mipi");
                     continue;
                 }
                 else
                 {
-                    Logger::instance().debug("Thread ComputeDistance - Successfully read raw data from MIPI");
+                    Logger::instance().info("Thread ComputeDistance - Successfully read raw data from MIPI");
                     
                     {          
                         UdpDataPacket pkt;
@@ -79,7 +75,7 @@ namespace TofProcesser {
                         pkt.data.resize(dataLen);
                         pkt.type = UdpPacketType::RAW_BYTES;
 
-                        memcpy(pkt.data.data(), src + 2 * 16384 * sizeof(unsigned char), dataLen);
+                        memcpy(pkt.data.data(), static_cast<unsigned char*>(tofImg.ptr()), dataLen);
 
                         {
                             std::lock_guard<std::mutex> lock(g_udpMutex);
@@ -89,6 +85,7 @@ namespace TofProcesser {
                     }
                 }
             }
+#if 0
             else if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD)
             {
                 bool hasNewData = false;
@@ -127,33 +124,6 @@ namespace TofProcesser {
 
 #endif
 
-#if 1
-            if (g_sysConfig.workMode == UartComm::WorkMode::TEST){
-                // 将src中的值修改为0-8000范围内的随机数（uint_16），模拟tof
-                for (size_t i = 0; i < kMaxTofFrameCount * 16384; ++i) {
-                    uint16_t randomValue = static_cast<uint16_t>(rand() % 8001); // 生成0-8000范围内的随机数
-                    src[i * 2] = randomValue & 0xFF; // 低8位
-                    src[i * 2 + 1] = (randomValue >> 8) & 0xFF; // 高8位
-                }
-                
-                {          
-                    UdpDataPacket pkt;
-                    size_t dataLen = 2 * 2 * 16384 * sizeof(unsigned char);
-                    pkt.data.resize(dataLen);
-                    pkt.type = UdpPacketType::RAW_BYTES;
-
-                    memcpy(pkt.data.data(), src + 2 * 16384 * sizeof(unsigned char), dataLen);
-
-                    {
-                        std::lock_guard<std::mutex> lock(g_udpMutex);
-                        g_udpRing.push(std::move(pkt));
-                    }
-                    g_udpCV.notify_one();
-                }
-                Logger::instance().debug("Thread tof process - send tof test data to udp");
-            }
-#endif
-
             auto computationTime = std::chrono::steady_clock::now() - computationStart;
             long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
             Logger::instance().debug(("Thread ComputeDistance - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
@@ -163,7 +133,5 @@ namespace TofProcesser {
                 std::this_thread::sleep_for(kComputeInterval - computationTime);
             }
         }
-
-        delete[] src;
     }
 }

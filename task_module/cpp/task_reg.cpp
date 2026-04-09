@@ -64,16 +64,6 @@ UartComm::HistConfig g_histConfig;
 
 void register_threads()
 {
-    // 时序初始化
-    // int status = ApdControl(1, 2000, 40, 19600, 200, 0, 3200, 1, 3, 1600);
-    int status = ApdControl(1, 2000, 40, 37592, 200, 0, 3200, 2, 3, 1600);
-    
-    if (status != 0) {
-        Logger::instance().error("Failed to initialize APD time sequence");
-        return ;
-    }
-
-    Pcie_Init(0, 0);
 
     Logger::instance().info("Registering and starting threads");
     
@@ -81,11 +71,8 @@ void register_threads()
     Cooler::initCooler(coolerDevicePath, 4800);
 
     std::string devicePath = "/dev/ttyS3";
-    std::thread uartComm(PreprocessUart::thread_Preprocess_Communication, 
-                         devicePath, 
-                         115200, 
-                         200);
-                         
+    std::thread uartComm(PreprocessUart::thread_Uart_Communication, 
+                         devicePath,  115200,  200);              
     uartComm.detach();
     
     std::thread udpSend(UdpComm::thread_UdpSend);

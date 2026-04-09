@@ -1,19 +1,19 @@
 #include "apd_control.h"
 
 imgChnInfo_S depthImgChnAttr;
-// imgChnInfo_S tofImgChnAttr;
+imgChnInfo_S tofImgChnAttr;
 imgChnInfo_S outModAttr;
 
 
 void Pcie_Init(int inputChn, int outPutVencChn){
     // 初始化PCIE读取及写入通道
-    imgChnInfo_S depthImgChnAttr;
+    // imgChnInfo_S depthImgChnAttr;
     depthImgChnAttr.modType = MOD_ID_XDMA_VIDEO;
     depthImgChnAttr.xdmaVideo.dev = 0;
     depthImgChnAttr.xdmaVideo.chn = inputChn;
     depthImgChnAttr.xdmaVideo.timeOut = 0;
 
-    imgChnInfo_S outModAttr;
+    // imgChnInfo_S outModAttr;
     outModAttr.modType = MOD_ID_FPGA;
     outModAttr.img2Fpga.chn = outPutVencChn;
     outModAttr.img2Fpga.userSpace = true;
@@ -22,23 +22,14 @@ void Pcie_Init(int inputChn, int outPutVencChn){
     return ;
 }
 
-int Pcie_Depth_Read(img::ImgMod &depthImg){
+void Mipi_Init(int inputChn){
+    // imgChnInfo_S tofImgChnAttr;
+    tofImgChnAttr.modType = MOD_ID_VI;
+    tofImgChnAttr.xdmaVideo.dev = 0;
+    tofImgChnAttr.xdmaVideo.chn = inputChn;
+    tofImgChnAttr.xdmaVideo.timeOut = -1;
 
-    depthImg = img::imgRead(depthImgChnAttr);
-
-    if(depthImg.isEmptyFrame()){
-        return 0; // 无数据可读
-    }
-
-    return 1;
-}
-
-int Pcie_Tof_Read(){
-    return 0;
-}   
-
-int Pcie_Write(){
-    return 0;
+    return ;
 }
 
 // APD变量偏移地址 10000

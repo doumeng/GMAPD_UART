@@ -23,7 +23,7 @@ namespace PreprocessUart {
      * @param baudrate 波特率，默认 115200
      * @param periodMs 周期时间，默认 20ms
      */
-    void thread_Preprocess_Communication(const std::string &devicePath,
+    void thread_Uart_Communication(const std::string &devicePath,
                                          uint32_t baudrate = 115200,
                                          int periodMs = 20);
 

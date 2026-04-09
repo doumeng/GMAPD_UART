@@ -16,6 +16,9 @@ set(CMAKE_CXX_COMPILER  "/home/tcspc/gcc-arm-10.3-2021.07-x86_64-aarch64-none-li
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -fpermissive -fno-aggressive-loop-optimizations  -ffunction-sections -fdata-sections")
 add_definitions(-D__aarch64__)
 
+# find_package(OpenCV REQUIRED)
+include_directories(${OpenCV_INCLUDE_DIRS})
+
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/platform)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include/periphery)
@@ -37,5 +40,6 @@ file(GLOB SRC_LIST ${CMAKE_CURRENT_SOURCE_DIR}/*.cpp
 add_executable(${PROJECT_NAME} ${SRC_LIST})
 target_link_libraries(${PROJECT_NAME}  
     dl modules periphery rockchip_mpp rockit drm asound cli cjson pthread
+    ${OpenCV_LIBS}
     ###### user link lib
 )

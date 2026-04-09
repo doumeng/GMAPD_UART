@@ -33,21 +33,29 @@ namespace PreprocessUart {
             IDLE,
             // 0xC7 上电的阶段
             STARTING_1V8_5V,
+            STARTING_1V8_5V_WAIT,
             STARTING_30V,
+            STARTING_30V_WAIT,
             STARTING_50V,
+            STARTING_50V_WAIT,
             STARTING_55V,
+            STARTING_55V_WAIT,
             STARTING_58V,
+            STARTING_58V_WAIT,
             STARTING_SUCCESS,
             // 0xC8 下电的阶段
             SHUTDOWN_50V,
+            SHUTDOWN_50V_WAIT,
             SHUTDOWN_30V,
+            SHUTDOWN_30V_WAIT,
             SHUTDOWN_10V,
+            SHUTDOWN_10V_WAIT,
+            SHUTDOWN_10V_FINAL_WAIT,
             SHUTDOWN_SUCCESS
         };
 
         ApdPowerState currentApdState = ApdPowerState::IDLE;
         auto lastApdStateTime = std::chrono::steady_clock::now();
-        uint8_t activeMachineCmd = 0;
         uint8_t gCmdStatus = 0;
 
         struct CmdResponse {
@@ -64,28 +72,29 @@ namespace PreprocessUart {
                 case ApdPowerState::IDLE:
                 case ApdPowerState::STARTING_SUCCESS:
                 case ApdPowerState::SHUTDOWN_SUCCESS:
-                    activeMachineCmd = 0;
                     break;
                     
                 // ---------------- 0xC7 APD START -----------------
                 case ApdPowerState::STARTING_1V8_5V:
                     if (elapsedMs >= 100) {
-                        Logger::instance().info("PreprocessUart APD Start: Stage 30V");
+                        Logger::instance().info("PreprocessUart APD Start: Stage 1V8_5V");
 
                         SecondVoltageCtrl();
                         
-                        usleep(10000000); // 100ms 延时，确保电压稳定
-
-                        ApdGatherEn(1);
-
                         lastApdStateTime = now;
+                        currentApdState = ApdPowerState::STARTING_1V8_5V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::STARTING_1V8_5V_WAIT:
+                    if (elapsedMs >= 10000) { // 10s 延时，确保电压稳定
+                        ApdGatherEn(1);
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_30V;
                     }
                     break;
                 case ApdPowerState::STARTING_30V:
                     if (elapsedMs >= 100) {
-                        // 调试阶段：跳过 50V, 55V, 58V，直接进入下个必要流程
-                        Logger::instance().info("PreprocessUart APD Start: Stage -5V check (Debug Mode, max 30V)");
+                        Logger::instance().info("PreprocessUart APD Start: Stage 30V");
 
                         uint16_t spiValue = 0;
                         uint8_t levelValue = 0;
@@ -97,13 +106,16 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue); // 直接设置到 30V，跳过中间阶段
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 30.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue); 
                                    
-                        lastApdStateTime = now;
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::STARTING_30V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::STARTING_30V_WAIT:
+                    if (elapsedMs >= 1000) { // 1s 延时
+                        g_sysConfig.biasVoltage = 30.0f;
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_50V;
                     }
                     break;
@@ -121,13 +133,16 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue);
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 50.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue);
 
-                        lastApdStateTime = now;
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::STARTING_50V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::STARTING_50V_WAIT:
+                    if (elapsedMs >= 1000) { // 1s 延时
+                        g_sysConfig.biasVoltage = 50.0f;
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_55V;
                     }
                     break;
@@ -144,19 +159,22 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue);
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 55.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue);
 
-                        lastApdStateTime = now;
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::STARTING_55V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::STARTING_55V_WAIT:
+                    if (elapsedMs >= 1000) { // 1s 延时
+                        g_sysConfig.biasVoltage = 55.0f;
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_58V;
                     }
                     break;
                 case ApdPowerState::STARTING_58V:
                     if (elapsedMs >= 100) {
-                        Logger::instance().info("PreprocessUart APD Start: Stage 58V check");
+                        Logger::instance().info("PreprocessUart APD Start: Stage 58V");
 
                         uint16_t spiValue = 0;
                         uint8_t levelValue = 0;
@@ -168,13 +186,16 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue);
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 58.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue);
 
-                        lastApdStateTime = now;
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::STARTING_58V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::STARTING_58V_WAIT:
+                    if (elapsedMs >= 1000) { // 1s 延时
+                        g_sysConfig.biasVoltage = 58.0f;
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_SUCCESS;
                     }
                     break;
@@ -194,13 +215,16 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue);
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 50.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue);
 
-                        lastApdStateTime = now;
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::SHUTDOWN_50V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::SHUTDOWN_50V_WAIT:
+                    if (elapsedMs >= 1000) {
+                        g_sysConfig.biasVoltage = 50.0f;
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::SHUTDOWN_30V;
                     }
                     break;
@@ -218,13 +242,16 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue);
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 30.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue);
 
-                        lastApdStateTime = now;
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::SHUTDOWN_30V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::SHUTDOWN_30V_WAIT:
+                    if (elapsedMs >= 1000) {
+                        g_sysConfig.biasVoltage = 30.0f;
+                        lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::SHUTDOWN_10V;
                     }
                     break;
@@ -242,16 +269,23 @@ namespace PreprocessUart {
                             << ", Level=" << static_cast<int>(levelValue);
                         Logger::instance().info(msg.str().c_str());
 
-                        {
-                            HighVoltageCtrl(spiValue, levelValue);
-                            usleep(1000000); // 1s 延时，确保电压稳定
-                            g_sysConfig.biasVoltage = 10.0f;
-                        }
+                        HighVoltageCtrl(spiValue, levelValue);
 
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::SHUTDOWN_10V_WAIT;
+                    }
+                    break;
+                case ApdPowerState::SHUTDOWN_10V_WAIT:
+                    if (elapsedMs >= 1000) {
+                        g_sysConfig.biasVoltage = 10.0f;
                         ApdGatherEn(0);
                         
-                        usleep(1000000); // 1s 延时，确保电压稳定
-
+                        lastApdStateTime = std::chrono::steady_clock::now();
+                        currentApdState = ApdPowerState::SHUTDOWN_10V_FINAL_WAIT;
+                    }
+                    break;
+                case ApdPowerState::SHUTDOWN_10V_FINAL_WAIT:
+                    if (elapsedMs >= 1000) {
                         ShutdownVoltageCtrl();
 
                         currentApdState = ApdPowerState::SHUTDOWN_SUCCESS;
@@ -414,7 +448,7 @@ namespace PreprocessUart {
                     g_stateCache.power_on_off_count = 1;
                 }
 
-                if (g_stateCache.power_on_off_count >= 3) {
+                if (g_stateCache.power_on_off_count >= 1) {
                     uint8_t cooler_cmd = cmd.power_on_off & 0x01;
                     uint8_t apd_power_cmd = (cmd.power_on_off >> 1) & 0x01;
                     
@@ -423,32 +457,31 @@ namespace PreprocessUart {
 
                     if (cooler_cmd != last_cooler_cmd) {
                         if (cooler_cmd == 1) {
-                            Logger::instance().info("PreprocessUart - 制冷机上电 (已确认3次)");
+                            Logger::instance().info("PreprocessUart - 制冷机上电");
                             if (Cooler::startCooler() == 0) {
-                                g_power_status |= 0x01; // D0=1 失败
-                            } else {
                                 g_power_status &= ~0x01; // D0=0 成功
+                            } else {
+                                g_power_status |= 0x01;  // D0=1 失败
                             }
                         } else {
-                            Logger::instance().info("PreprocessUart - 制冷机下电 (已确认3次)");
+                            Logger::instance().info("PreprocessUart - 制冷机下电");
                             if (Cooler::stopCooler() == 0) {
-                                g_power_status |= 0x01;
+                                g_power_status &= ~0x01; // D0=0 成功
                             } else {
-                                g_power_status &= ~0x01; 
+                                g_power_status |= 0x01;  // D0=1 失败
                             }
                         }
                     }
 
                     if (apd_power_cmd != last_apd_power_cmd) {
                         if (apd_power_cmd == 1) {
-                            Logger::instance().info("PreprocessUart - APD启动状态机 (已确认3次)");
-                            activeMachineCmd = 0xC7; // 复用状态机标志
+                            Logger::instance().info("PreprocessUart - 探测器上电状态机");
+
                             currentApdState = ApdPowerState::STARTING_1V8_5V;
                             lastApdStateTime = std::chrono::steady_clock::now();
                             g_power_status &= ~0x02; // 0 APD上电
                         } else {
-                            Logger::instance().info("PreprocessUart - 探测器下电状态机 (已确认3次)");
-                            activeMachineCmd = 0xC8;
+                            Logger::instance().info("PreprocessUart - 探测器下电状态机");
                             currentApdState = ApdPowerState::SHUTDOWN_50V;
                             lastApdStateTime = std::chrono::steady_clock::now();
                             g_power_status |= 0x02; // 1 APD下电
@@ -521,7 +554,7 @@ namespace PreprocessUart {
         }
     } // namespace
 
-    void thread_Preprocess_Communication(const std::string &devicePath,
+    void thread_Uart_Communication(const std::string &devicePath,
                                          uint32_t baudrate,
                                          int periodMs) {
         Logger::instance().info(("PreprocessUart thread started on " + devicePath).c_str());
@@ -544,7 +577,7 @@ namespace PreprocessUart {
             if (rxData.size() == kFrameSize) {
                 std::array<uint8_t, kFrameSize> rxArray;
                 std::copy(rxData.begin(), rxData.end(), rxArray.begin());
-                Logger::instance().info(("PreprocessUart Received frame: " + frameToHex(rxArray)).c_str());
+                Logger::instance().debug(("PreprocessUart Received frame: " + frameToHex(rxArray)).c_str());
 
                 CommandFrame cmdFrame;
                 std::string reason;
@@ -589,7 +622,7 @@ namespace PreprocessUart {
                                                voltLow, voltHigh);
             std::vector<uint8_t> txData(reply.raw.begin(), reply.raw.end());
             
-            Logger::instance().info(("PreprocessUart Sending reply frame: " + frameToHex(reply.raw)).c_str());
+            Logger::instance().debug(("PreprocessUart Sending reply frame: " + frameToHex(reply.raw)).c_str());
            
             SerialUtils::write_frame(serial, txData);
 

@@ -35,6 +35,7 @@ int main()
     Logger::instance().info(("Output directory initialized: " + g_outputDir).c_str());
     Logger::instance().info("System initialized");
 
+    // 预处理模块初始化
     img::imgInit();
 
     // 电压初始化
@@ -45,6 +46,18 @@ int main()
         Logger::instance().error("Failed to initialize board power control");
         return 1;
     }
+
+    // APD时序初始化
+    status = ApdControl(1, 2000, 40, 19600, 200, 0, 3200, 1, 3, 1000);
+    // int status = ApdControl(1, 2000, 40, 37592, 200, 0, 3200, 2, 3, 1600);
+    
+    if (status != 0) {
+        Logger::instance().error("Failed to initialize APD time sequence");
+        return 1;
+    }
+
+    Pcie_Init(0, 0);
+    Mipi_Init(0);
 
 // --- 互动测试：手动输入电压值，获取 SPI 和 Level ---
 #if 0

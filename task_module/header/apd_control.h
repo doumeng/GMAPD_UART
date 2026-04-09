@@ -17,7 +17,7 @@
 #include "img.h"
 
 extern imgChnInfo_S depthImgChnAttr;
-// extern imgChnInfo_S tofImgChnAttr;
+extern imgChnInfo_S tofImgChnAttr;
 extern imgChnInfo_S outModAttr;
 
 //  电源控制
@@ -28,9 +28,7 @@ int ShutdownVoltageCtrl();                      // 关机控制函数
 
 // PCIE初始化
 void Pcie_Init(int inputChn, int outPutVencChn);
-int Pcie_Depth_Read(img::ImgMod &depthImg);
-int Pcie_Tof_Read();
-int Pcie_Write();
+void Mipi_Init(int inputChn);
 
 // 时序控制
 int ApdControl(int control, int sync_delay, int sync_pulse_width,
