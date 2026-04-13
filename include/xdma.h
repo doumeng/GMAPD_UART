@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <thread>
+#include <memory>
 #include <mutex>
 #include "xdmaCfg.h"
 /* return state*/

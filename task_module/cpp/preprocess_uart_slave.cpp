@@ -3,6 +3,7 @@
 // 1. C++ 标准库
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <iomanip>
 #include <sstream>
 #include <string>
@@ -64,6 +65,149 @@ namespace PreprocessUart {
             uint8_t resp3 = 0;
         };
 
+        struct PreprocessStateCache {
+            uint16_t apd_bias = 0;
+            uint8_t ctl_para = 0;
+            uint8_t algo_frame_denoise = 0;
+            uint8_t algo_stride_diff = 0;
+            uint8_t algo_kernal = 0;
+            uint8_t power_on_off = 0;
+            uint8_t last_received_power_on_off = 0xFF;
+            int power_on_off_count = 0;
+            uint16_t distance = 0;
+            uint16_t velocity = 0;
+            uint16_t temp_ctl = 0;
+        };
+
+        PreprocessStateCache g_stateCache;
+        uint8_t g_apd_bias_status = 0;
+        uint8_t g_ctl_para_status = 0;
+        uint8_t g_algo_para_status = 0;
+        uint8_t g_power_status = 0;
+
+        uint8_t generateVersionNumber(uint8_t major, uint8_t minor) {
+            return (major << 4) | (minor & 0x0F);
+        }
+
+        uint8_t AlgoParaSetting(uint8_t algo_frame_denoise, uint8_t algo_stride_diff, uint8_t algo_kernal) {
+            int status = 0;
+            uint8_t constructFrame = algo_frame_denoise & 0x0F; // 低4位
+            uint8_t denoiseLevel = (algo_frame_denoise >> 4) & 0x0F; // 高4位
+
+            uint8_t strideLength = algo_stride_diff & 0x0F; // 低4位
+            uint8_t diffThreshold = (algo_stride_diff >> 4) & 0x0F; // 高4位
+
+            uint8_t kernalSize = algo_kernal;
+
+            g_histConfig.stride = strideLength;
+            g_histConfig.threshold = diffThreshold;
+            g_histConfig.kernalSize = kernalSize;
+            g_histConfig.denoiseLevel = denoiseLevel;
+            g_histConfig.frameNum = constructFrame;
+            
+            // TODO:调整统计帧数
+            {
+                ApdGatherEn(0);
+                usleep(100000);
+
+                if (ApdConstructFrameCtrl(constructFrame)){
+                    Logger::instance().error("Failed to set APD construct frame control");
+                    status = 1;
+                }
+                usleep(100000);
+                ApdGatherEn(1);
+            }
+
+            if (StrideLengthCtrl(strideLength)){
+                Logger::instance().error("Failed to set stride length");
+                status = 1;
+            }
+
+            if (DiffThreholdCtrl(diffThreshold)){
+                Logger::instance().error("Failed to set difference threshold");
+                status = 1;
+            }
+
+            return status;
+        }
+
+        uint8_t DelaySetting(uint16_t distance) {
+            int delay = ComputeDelay(distance, 2, 1000) / 5;
+
+            Logger::instance().info(("PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
+
+            EnDelayCtrl(delay);
+            RecDelayCtrl(delay + 1);
+
+            {
+                g_sysConfig.enDelay = delay * 5; // 转换回实际延迟值
+            }
+            return 0;
+        }
+
+        uint8_t ApdStateSetting(uint8_t ctl_para) {
+            uint8_t triggerMode = ctl_para & 0x01; // 低1位
+            uint8_t testPoint = (ctl_para >> 1) & 0x01; // 第2位
+            uint8_t outputMode = (ctl_para >> 2) & 0x01; // 其余6位
+
+            if (triggerMode == 0) {
+                // 外触发
+                if (TriggerModeCtrl(1)){
+                    Logger::instance().error("Failed to set APD trigger mode");
+                    return 1;
+                }
+                g_sysConfig.triggerMode = UartComm::TriggerMode::EXTERNAL;
+
+            } else {
+                // 内触发
+                if (TriggerModeCtrl(0))
+                {
+                    Logger::instance().error("Failed to set APD trigger mode");
+                    return 1;
+                }
+                if (CycleCtrl(20000))
+                {
+                    Logger::instance().error("Failed to set APD cycle control");
+                    return 1;
+                }
+                g_sysConfig.triggerMode = UartComm::TriggerMode::INTERNAL;
+            }
+
+            if (testPoint == 0) {
+                // 测试点关
+                if (ApdTestEn(0)){
+                    Logger::instance().error("Failed to set test point mode");
+                    return 1;
+                }
+            } else {
+                //测试点开
+                if (ApdTestEn(1)){
+                    Logger::instance().error("Failed to set test point mode");
+                    return 1;
+                }
+            }
+
+            if (outputMode == 0) {
+                // 输出depth
+                if (PcieChlCtrl(1))
+                {
+                    Logger::instance().error("Failed to set PCIe channel control");
+                    return 1;
+                }
+                g_sysConfig.workMode = UartComm::WorkMode::STANDARD;
+            } else {
+                // 输出tof
+                if (PcieChlCtrl(0))
+                {
+                    Logger::instance().error("Failed to set PCIe channel control");
+                    return 1;
+                }
+                g_sysConfig.workMode = UartComm::WorkMode::TEST;
+            }
+
+            return 0;
+        }
+
         void processApdStateMachine() {
             auto now = std::chrono::steady_clock::now();
             int elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - lastApdStateTime).count();
@@ -80,14 +224,19 @@ namespace PreprocessUart {
                         Logger::instance().info("PreprocessUart APD Start: Stage 1V8_5V");
 
                         SecondVoltageCtrl();
-                        
+
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::STARTING_1V8_5V_WAIT;
                     }
                     break;
                 case ApdPowerState::STARTING_1V8_5V_WAIT:
                     if (elapsedMs >= 10000) { // 10s 延时，确保电压稳定
+                        
                         ApdGatherEn(1);
+                        
+                        ApdStateSetting(0); // 下发默认参数，开始输出图像
+                        g_stateCache.ctl_para = 0;
+
                         lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_30V;
                     }
@@ -294,150 +443,6 @@ namespace PreprocessUart {
             }
         }
         
-        // 生成1字节版本号：高四位为大版本，低四位为小版本
-        uint8_t generateVersionNumber(uint8_t major, uint8_t minor) {
-            return (major << 4) | (minor & 0x0F);
-        }
-
-        // 处理控制参数 (原0xC4功能)
-        uint8_t ApdStateSetting(uint8_t ctl_para) {
-            uint8_t triggerMode = ctl_para & 0x01; // 低1位
-            uint8_t testPoint = (ctl_para >> 1) & 0x01; // 第2位
-            uint8_t outputMode = (ctl_para >> 2) & 0x01; // 其余6位
-
-            if (triggerMode == 0) {
-                // 外触发
-                if (TriggerModeCtrl(1)){
-                    Logger::instance().error("Failed to set APD trigger mode");
-                    return 1;
-                }
-                g_sysConfig.triggerMode = UartComm::TriggerMode::EXTERNAL;
-
-            } else {
-                // 内触发
-                if (TriggerModeCtrl(0))
-                {
-                    Logger::instance().error("Failed to set APD trigger mode");
-                    return 1;
-                }
-                if (CycleCtrl(40000))
-                {
-                    Logger::instance().error("Failed to set APD cycle control");
-                    return 1;
-                }
-                g_sysConfig.triggerMode = UartComm::TriggerMode::INTERNAL;
-            }
-
-            if (testPoint == 0) {
-                // 测试点关
-                if (ApdTestEn(0)){
-                    Logger::instance().error("Failed to set test point mode");
-                    return 1;
-                }
-                
-            } else {
-                //测试点开
-                if (ApdTestEn(1)){
-                    Logger::instance().error("Failed to set test point mode");
-                    return 1;
-                }
-            }
-
-            if (outputMode == 0) {
-                // 输出depth
-                if (PcieChlCtrl(1))
-                {
-                    Logger::instance().error("Failed to set PCIe channel control");
-                    return 1;
-                }
-                g_sysConfig.workMode = UartComm::WorkMode::STANDARD;
-            } else {
-                // 输出tof
-                if (PcieChlCtrl(0))
-                {
-                    Logger::instance().error("Failed to set PCIe channel control");
-                    return 1;
-                }
-                g_sysConfig.workMode = UartComm::WorkMode::TEST;
-            }
-
-            return 0;
-        }
-
-        // 处理算法参数 (原0xC5功能)
-        uint8_t AlgoParaSetting(uint8_t algo_frame_denoise, uint8_t algo_stride_diff, uint8_t algo_kernal) {
-            int status = 0;
-            uint8_t constructFrame = algo_frame_denoise & 0x0F; // 低4位
-            uint8_t denoiseLevel = (algo_frame_denoise >> 4) & 0x0F; // 高4位
-
-            uint8_t strideLength = algo_stride_diff & 0x0F; // 低4位
-            uint8_t diffThreshold = (algo_stride_diff >> 4) & 0x0F; // 高4位
-
-            uint8_t kernalSize = algo_kernal;
-
-            g_histConfig.stride = strideLength;
-            g_histConfig.threshold = diffThreshold;
-            g_histConfig.kernalSize = kernalSize;
-            g_histConfig.denoiseLevel = denoiseLevel;
-            g_histConfig.frameNum = constructFrame;
-            
-            // TODO:调整统计帧数
-            {
-                ApdGatherEn(0);
-                usleep(100000);
-
-                if (ApdConstructFrameCtrl(constructFrame)){
-                    Logger::instance().error("Failed to set APD construct frame control");
-                    status = 1;
-                }
-                usleep(100000);
-                ApdGatherEn(1);
-            }
-
-            if (StrideLengthCtrl(strideLength)){
-                Logger::instance().error("Failed to set stride length");
-                status = 1;
-            }
-
-            if (DiffThreholdCtrl(diffThreshold)){
-                Logger::instance().error("Failed to set difference threshold");
-                status = 1;
-            }
-
-            return status;
-        }
-
-        // 处理延迟设置 (原0xC6功能)
-        uint8_t DelaySetting(uint16_t distance) {
-            int delay = ComputeDelay(distance, 2, 1000);
-
-            Logger::instance().info(("PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
-
-            EnDelayCtrl(delay);
-            RecDelayCtrl(delay + 1);
-            return 0;
-        }
-
-        struct PreprocessStateCache {
-            uint16_t apd_bias = 0;
-            uint8_t ctl_para = 0;
-            uint8_t algo_frame_denoise = 0;
-            uint8_t algo_stride_diff = 0;
-            uint8_t algo_kernal = 0;
-            uint8_t power_on_off = 0;
-            uint8_t last_received_power_on_off = 0xFF;
-            int power_on_off_count = 0;
-            uint16_t distance = 0;
-            uint16_t velocity = 0;
-            uint16_t temp_ctl = 0;
-        };
-
-        PreprocessStateCache g_stateCache;
-        uint8_t g_apd_bias_status = 0;
-        uint8_t g_ctl_para_status = 0;
-        uint8_t g_algo_para_status = 0;
-        uint8_t g_power_status = 0;
-
         void handleFullStateFrame(const CommandFrame &cmd) {
             // 1. APD上下电与制冷机控制 (power_on_off 字节13)  D0: 制冷机(1开/0关), D1: APD探测器(1下电/0上电)
             if (cmd.power_on_off != g_stateCache.power_on_off) {
@@ -499,24 +504,32 @@ namespace PreprocessUart {
             // 2. APD 偏压状态 (apd_bias 字节7-8)
             if (cmd.apd_bias != g_stateCache.apd_bias) {
                 float targetVoltage = static_cast<float>(cmd.apd_bias & 0xFF) + (static_cast<float>(cmd.apd_bias >> 8) / 10.0f);
-                uint16_t spiValue = 0;
-                uint8_t levelValue = 0;
-                float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(targetVoltage, spiValue, levelValue);
+                float currentVoltage = g_sysConfig.biasVoltage;
                 
-                Logger::instance().info(("PreprocessUart - APD偏压设置, 请求=" + std::to_string(targetVoltage) + "V").c_str());
-                
-                if (HighVoltageCtrl(spiValue, levelValue) == 0) {
-                    g_apd_bias_status = 0; // 0x0 成功
+                if (std::abs(targetVoltage - currentVoltage) <= 13.0f) {
+                    uint16_t spiValue = 0;
+                    uint8_t levelValue = 0;
+                    float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(targetVoltage, spiValue, levelValue);
+                    
+                    Logger::instance().info(("PreprocessUart - APD偏压设置, 请求=" + std::to_string(targetVoltage) + "V").c_str());
+                    
+                    if (HighVoltageCtrl(spiValue, levelValue) == 0) {
+                        g_apd_bias_status = 0; // 0x0 成功
+                    } else {
+                        g_apd_bias_status = 1; // 0x1 失败
+                    }
+                    g_sysConfig.biasVoltage = targetVoltage;
+                    g_stateCache.apd_bias = cmd.apd_bias;
                 } else {
+                    Logger::instance().error(("PreprocessUart - APD偏压突变过大请求被丢弃: 当前=" + std::to_string(currentVoltage) + "V, 请求=" + std::to_string(targetVoltage) + "V").c_str());
                     g_apd_bias_status = 1; // 0x1 失败
                 }
-                g_sysConfig.biasVoltage = targetVoltage;
-                g_stateCache.apd_bias = cmd.apd_bias;
             }
 
             // 3. APD控制参数 (ctl_para 字节9)
             if (cmd.ctl_para != g_stateCache.ctl_para) {
                 Logger::instance().info("PreprocessUart - APD控制参数设置");
+                
                 g_ctl_para_status = ApdStateSetting(cmd.ctl_para); 
                 g_stateCache.ctl_para = cmd.ctl_para;
             }

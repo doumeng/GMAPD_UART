@@ -62,18 +62,18 @@ namespace TofProcesser {
                 img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
 
                 if(tofImg.isEmptyFrame()){
-                    Logger::instance().info("Thread tof process - Failed to read point cloud from mipi");
+                    Logger::instance().debug("Thread tof process - Failed to read point cloud from MIPI");
                     continue;
                 }
                 else
                 {
-                    Logger::instance().info("Thread ComputeDistance - Successfully read raw data from MIPI");
+                    Logger::instance().debug("Thread tof process - Successfully read raw data from MIPI");
                     
                     {          
                         UdpDataPacket pkt;
                         size_t dataLen = 2 * 2 * 16384 * sizeof(unsigned char);
                         pkt.data.resize(dataLen);
-                        pkt.type = UdpPacketType::RAW_BYTES;
+                        pkt.type = UdpPacketType::TOF_IMAGE;
 
                         memcpy(pkt.data.data(), static_cast<unsigned char*>(tofImg.ptr()), dataLen);
 
@@ -83,6 +83,15 @@ namespace TofProcesser {
                         }
                         g_udpCV.notify_one();
                     }
+                }
+
+                auto computationTime = std::chrono::steady_clock::now() - computationStart;
+                long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
+                Logger::instance().info(("Thread ComputeDistance - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
+
+                if (computationTime < kComputeInterval)
+                {
+                    std::this_thread::sleep_for(kComputeInterval - computationTime);
                 }
             }
 #if 0
@@ -123,15 +132,6 @@ namespace TofProcesser {
             }
 
 #endif
-
-            auto computationTime = std::chrono::steady_clock::now() - computationStart;
-            long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
-            Logger::instance().debug(("Thread ComputeDistance - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
-
-            if (computationTime < kComputeInterval)
-            {
-                std::this_thread::sleep_for(kComputeInterval - computationTime);
-            }
         }
     }
 }

@@ -60,6 +60,11 @@ typedef struct vencChnInfo{
     int chn;
     int timeOut;
 }vencChnInfo_S;
+typedef struct viChnInfo{
+    int dev;
+    int chn;
+    int timeOut;
+}viChnInfo_S;
 
 typedef struct vpssChnInfo{
     int grp;
@@ -93,6 +98,7 @@ typedef struct fpgaChnInfo{
 typedef struct imgChnInfo {
     RK_MODE_TYPE_E modType;
     union {
+        viChnInfo_S   vi;
         vpssChnInfo_S vpss;
         vencChnInfo_S venc;
         vdecChnInfo_S vdec;

@@ -16,7 +16,9 @@
 #include <algorithm>
 #include <chrono>
 #include <mutex>
-// #include <opencv2/opencv.hpp>
+
+#include <opencv2/opencv.hpp>
+#include <open3d/Open3D.h>
 
 
 namespace PointCloud {
@@ -29,7 +31,32 @@ namespace PointCloud {
         return result;
     }
 
-#if 0
+    // 处理原始深度图数据，填充UDP数据包
+    void processAndPackageDepthData(const uint32_t* rawData, int rows, int cols, int16_t offset, UdpDataPacket& udpPkt) {
+        size_t pixel_count = rows * cols;
+        udpPkt.dist.resize(pixel_count, 0.0f);
+        udpPkt.inten.resize(pixel_count, 0);
+        udpPkt.raw.resize(pixel_count, 0);
+
+        const uint16_t* raw_ptr = reinterpret_cast<const uint16_t*>(rawData);
+        uint16_t* out_raw_ptr = reinterpret_cast<uint16_t*>(udpPkt.raw.data());
+
+        for (size_t i = 0; i < pixel_count; ++i) {
+            uint16_t intensity = raw_ptr[2 * i];
+            uint16_t raw_dist = raw_ptr[2 * i + 1];
+
+            float real_dist = ((16000.0f - 2.0f * raw_dist) + offset) * 0.15f;
+            uint16_t scaled_dist = static_cast<uint16_t>(real_dist * 10.0f);
+
+            // udpPkt.inten[i] = intensity;
+            // udpPkt.dist[i] = real_dist;
+
+            out_raw_ptr[2 * i] = intensity;
+            out_raw_ptr[2 * i + 1] = scaled_dist;
+        }
+    }
+
+#if 1
     void processDepthImage(const uint32_t* rawData, int rows, int cols, UdpDataPacket& udpPkt) {
         size_t pixel_count = rows * cols;
         
@@ -97,7 +124,6 @@ namespace PointCloud {
 
             auto start_time = std::chrono::high_resolution_clock::now();
 
-#if 1   
             if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD)
             {
 
@@ -109,64 +135,37 @@ namespace PointCloud {
                 }
                 else{
                     Logger::instance().debug("Thread PointCloudProcess - Successfully read point cloud from PCIe");
-                    // TODO: 添加处理点云的代码
                     
                     // 发送 UDP 数据 (放入队列)
                     {
                         UdpDataPacket udpPkt;
-                        udpPkt.type = UdpPacketType::POINT_CLOUD_PROCESS;
+                        udpPkt.type = UdpPacketType::DEPTH_IMAGE;
                         udpPkt.rows = 128;
                         udpPkt.cols = 128;
                         
                         // 调用 OpenCV 接口处理图像，并填充距离和强度
-                        // uint32_t* rawData = reinterpret_cast<uint32_t*>(depthImg.ptr());
-                        // processDepthImage(rawData, udpPkt.rows, udpPkt.cols, udpPkt);
-
-                        // 给udpPkt填充数据，距离和强度填0，原始数据填充PCIe读取的深度图数据
-                        size_t pixel_count = 128 * 128;
-
-                        udpPkt.dist.resize(pixel_count, 0.0f);
-                        udpPkt.inten.resize(pixel_count, 0);
-                        udpPkt.raw.resize(pixel_count, 0);
+                         uint32_t* rawData = reinterpret_cast<uint32_t*>(depthImg.ptr());
+                         processDepthImage(rawData, udpPkt.rows, udpPkt.cols, udpPkt);
+#if 0
+                        // size_t pixel_count = 128 * 128;
+                        // udpPkt.dist.resize(pixel_count, 0.0f);
+                        // udpPkt.inten.resize(pixel_count, 0);
+                        // udpPkt.raw.resize(pixel_count, 0);
 
                         // 将depthImg.ptr()的数据复制到udpPkt.raw中
-                        std::memcpy(udpPkt.raw.data(), depthImg.ptr(), pixel_count * sizeof(uint32_t));
-                        
+                        // std::memcpy(udpPkt.raw.data(), depthImg.ptr(), pixel_count * sizeof(uint32_t));
+                        const uint32_t* rawData = reinterpret_cast<const uint32_t*>(depthImg.ptr());
+                        processAndPackageDepthData(rawData, udpPkt.rows, udpPkt.cols, g_sysConfig.enDelay, udpPkt);
+#endif
                         {
                             std::lock_guard<std::mutex> lock(g_udpMutex);
                             g_udpRing.push(std::move(udpPkt));
-
                         }
 
                         g_udpCV.notify_one();
                         
                     }
-
                 }
-#endif
-
-#if 0
-            // 发送 UDP 数据 (放入队列)
-            {
-                UdpDataPacket udpPkt;
-                udpPkt.type = UdpPacketType::POINT_CLOUD_PROCESS;
-                udpPkt.rows = 128;
-                udpPkt.cols = 128;
-                
-                size_t pixel_count = 128 * 128;
-
-                udpPkt.dist.resize(pixel_count, 100.0f);
-                udpPkt.inten.resize(pixel_count, 255);
-                udpPkt.raw.resize(pixel_count, 255);
-
-                {
-                    std::lock_guard<std::mutex> lock(g_udpMutex);
-                    g_udpRing.push(std::move(udpPkt));
-                }
-
-                g_udpCV.notify_one();
-            }
-#endif
             auto computationTime = std::chrono::high_resolution_clock::now() - start_time;
             long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
             Logger::instance().info(("Thread PointCloudProcess - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
@@ -177,5 +176,5 @@ namespace PointCloud {
             }
         }
     }
-}
+    }
 }

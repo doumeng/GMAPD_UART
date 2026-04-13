@@ -8,17 +8,17 @@
 
 // 发送数据结构定义
 enum class UdpPacketType {
-    RAW_BYTES,
-    POINT_CLOUD_PROCESS
+    TOF_IMAGE,
+    DEPTH_IMAGE,
 };
 
 struct UdpDataPacket {
-    UdpPacketType type = UdpPacketType::RAW_BYTES;
+    UdpPacketType type = UdpPacketType::DEPTH_IMAGE;
 
-    // RAW_BYTES payload
+    // TOF payload
     std::vector<uint8_t> data;
 
-    // POINT_CLOUD_PROCESS payload
+    // DEPTH payload
     std::vector<float> dist;
     std::vector<uint16_t> inten;
     std::vector<int32_t> raw; 

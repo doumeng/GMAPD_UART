@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <thread>
 #include <poll.h>
+#include <memory>
 
 #define USE_RK_GPIO
 //计算RK gpio NUM的公式

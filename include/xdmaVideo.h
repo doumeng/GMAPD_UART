@@ -9,8 +9,6 @@
 
 namespace xdmaVideoSpace{
 
-#define DEPTH (4)
-
 //图像输入全局初始化
 int xdmaVideoInit();
 bool xdmaInitFlag();

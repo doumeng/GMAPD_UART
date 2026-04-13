@@ -1,5 +1,3 @@
-#include "udp_send.h"
-
 #include <cstring>
 #include <ctime>
 
@@ -14,6 +12,7 @@
 
 #include "log.h"
 #include "task_reg.h"
+#include "udp_send.h"
 
 namespace UdpComm {
 
@@ -114,7 +113,7 @@ namespace UdpComm {
         ).c_str());
 
         if (total_fragments > max_fragments) {
-            Logger::instance().debug("Data too large, only sending first 8 fragments");
+            Logger::instance().debug("Data too large, only sending first 128 fragments");
             total_fragments = max_fragments; // 最多128片
         }
 
@@ -178,10 +177,10 @@ namespace UdpComm {
 
             task_id = (task_id + 1) % 0xFFFFFF;
 
-            if (pkt.type == UdpPacketType::RAW_BYTES && !pkt.data.empty()) {
+            if (pkt.type == UdpPacketType::TOF_IMAGE && !pkt.data.empty()) {
                 udp_Sender.sendData(pkt.data.data(), pkt.data.size(), task_id, 1);
             }
-            else if (pkt.type == UdpPacketType::POINT_CLOUD_PROCESS) {
+            else if (pkt.type == UdpPacketType::DEPTH_IMAGE) {
                 size_t pixel_count = pkt.rows * pkt.cols;
                 if (pkt.dist.size() == pixel_count && pkt.inten.size() == pixel_count && pkt.raw.size() == pixel_count) {
                     uint32_t * data = interleaveArrays(pkt.dist.data(), pkt.inten.data(), pixel_count);

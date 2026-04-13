@@ -4,7 +4,7 @@
 #include "rkVencConfig.h"
 #include "commInfo.h"
 #include <thread>
-
+#include <memory>
 
 typedef struct VENC_GETSTREAM_PARA {
     bool bThreadStart;
