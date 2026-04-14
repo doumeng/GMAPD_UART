@@ -104,8 +104,11 @@ namespace PreprocessUart {
             g_histConfig.kernalSize = kernalSize;
             g_histConfig.denoiseLevel = denoiseLevel;
             g_histConfig.frameNum = constructFrame;
-            
-            // TODO:调整统计帧数
+
+            g_histConfig.dbscanEps = denoiseLevel;
+            g_histConfig.dbscanMinSamples = constructFrame;
+
+#if 0
             {
                 ApdGatherEn(0);
                 usleep(100000);
@@ -117,6 +120,7 @@ namespace PreprocessUart {
                 usleep(100000);
                 ApdGatherEn(1);
             }
+#endif
 
             if (StrideLengthCtrl(strideLength)){
                 Logger::instance().error("Failed to set stride length");
@@ -138,7 +142,6 @@ namespace PreprocessUart {
 
             EnDelayCtrl(delay);
             RecDelayCtrl(delay + 1);
-
             {
                 g_sysConfig.enDelay = delay * 5; // 转换回实际延迟值
             }
@@ -197,11 +200,6 @@ namespace PreprocessUart {
                 g_sysConfig.workMode = UartComm::WorkMode::STANDARD;
             } else {
                 // 输出tof
-                if (PcieChlCtrl(0))
-                {
-                    Logger::instance().error("Failed to set PCIe channel control");
-                    return 1;
-                }
                 g_sysConfig.workMode = UartComm::WorkMode::TEST;
             }
 

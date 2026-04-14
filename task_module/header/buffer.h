@@ -27,12 +27,6 @@ struct UdpDataPacket {
     int cols;
 };
 
-struct PcieDataPacket {
-    int channel;
-    std::vector<uint16_t> depth;     // 存储深度数据
-    std::vector<uint16_t> intensity; // 存储强度数据
-};
-
 template <typename T, size_t Capacity>
 class LatestRingBuffer {
 public:

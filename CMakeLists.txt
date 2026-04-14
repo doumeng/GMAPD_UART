@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0)
+cmake_minimum_required(VERSION 3.10)
 
 set(PROJECT_NAME GMAPD_UART)
 
@@ -47,6 +47,4 @@ target_link_libraries(${PROJECT_NAME}
         ${OpenCV_LIBS}
         Open3D::Open3D
         ###### user link lib
-
-
 )

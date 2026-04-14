@@ -13,14 +13,40 @@
 #include <string>
 #include <memory>
 #include <tuple>
+#include <cstdint>
 
-#include "util.h" // 包含二维数组分配和释放的函数声明
-#include "log.h"  // 日志记录功能
+#include <opencv2/opencv.hpp>
+
+#include "util.h"     // 包含二维数组分配和释放的函数声明
+#include "log.h"      // 日志记录功能
 #include "task_reg.h" // 包含共享数据结构和全局变量声明
 
-// 二维数组内存分配和释放由 util.h 提供
-
 namespace PointCloud {
-    void thread_PointCloudProcess();
-}
 
+    // 1. 解析原始数据中的强度和距离，并将飞行时间转换为距离（*10 缩放存为 uint16）
+    void parseDepthData(const uint32_t* rawData, int rows, int cols, int16_t offset,
+                        cv::Mat& intenMat, cv::Mat& distMat);
+
+    // 2. 根据强度阈值对强度图和距离图进行降噪（低于阈值的像素清零）
+    void denoiseByIntensity(cv::Mat& intenMat, cv::Mat& distMat, uint8_t threshold);
+
+    // 2.2 使用 Open3D DBSCAN 对深度和强度进行聚类降噪
+    // eps/minSamples < 0 时，自动回退为全局配置 g_histConfig 中对应参数
+    void denoiseByDbscanOpen3D(const cv::Mat& intenIn, const cv::Mat& distIn,
+                               cv::Mat& intenOut, cv::Mat& distOut,
+                               float eps = -1.0f, int minSamples = -1);
+
+    // 3. 对强度图和距离图执行形态学开运算（腐蚀+膨胀），去除孤立散点
+    void morphologicalFilter(const cv::Mat& intenIn, const cv::Mat& distIn,
+                             cv::Mat& intenOut, cv::Mat& distOut, uint8_t kSize);
+
+    // 4. 将处理后的强度图和距离图打包输出到 UdpDataPacket
+    void packDepthOutput(const cv::Mat& intenMat, const cv::Mat& distMat,
+                         int rows, int cols, UdpDataPacket& udpPkt);
+
+    // 完整处理流水线：解析并进行降噪
+    void processDenoisedDepthImage(const uint32_t* rawData, int rows, int cols, int16_t offset, UdpDataPacket& udpPkt);
+
+    void thread_PointCloudProcess();
+
+}

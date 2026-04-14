@@ -31,17 +31,6 @@ namespace UartComm {
         EXTERNAL                                        // 外触发 1
     };
 
-    // 指令类型
-    enum class UartCmdType
-    {
-        NONE,
-        PARAM_CONFIG,                                   // 0xC4 参数配置
-        MOTION_INFO,                                    // 0xC6 弹体信息
-        APD_Timing_START,                               // 0xC7 APD时序启动指令
-        STANDBY,                                        // 0xCA 待机指令
-        APD_STOP                                        // 0xCB 下电指令
-    };
-
     // 系统配置参数
     struct SystemConfig
     {
@@ -58,11 +47,18 @@ namespace UartComm {
         std::condition_variable cv;
         bool updated = false;
 
-        uint8_t frameNum = 0;                               // 帧数
-        int16_t stride = 8;                               // 系统配置
+        uint8_t frameNum = 4;                             // 帧数
+
+        int16_t stride = 4;                               // 系统配置
         int16_t threshold = 2;                            // 阈值
+
         uint8_t kernalSize = 3;                           // 核大小
-        uint8_t denoiseLevel = 3;                            // 降噪等级
+
+        uint8_t denoiseLevel = 3;                         // 降噪等级
+        float minDistance = 0.0f;                         // 最小距离(m)
+        float maxDistance = 6000.0f;                      // 最大距离(m)
+        float dbscanEps = 3.0f;                           // DBSCAN 邻域半径
+        uint16_t dbscanMinSamples = 7;                   // DBSCAN 最小样本数
     };
 
     // 弹体数据

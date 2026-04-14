@@ -49,7 +49,7 @@ namespace TofProcesser {
     // }
 
 
-    void thread_ComputeDistance()
+    void thread_TofProcess()
     {
         constexpr auto kComputeInterval = std::chrono::milliseconds(1000); // 模拟1秒读取一次
 
@@ -57,10 +57,10 @@ namespace TofProcesser {
         {
             auto computationStart = std::chrono::steady_clock::now();
 
+            img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
+
             if (g_sysConfig.workMode == UartComm::WorkMode::TEST)
             {
-                img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
-
                 if(tofImg.isEmptyFrame()){
                     Logger::instance().debug("Thread tof process - Failed to read point cloud from MIPI");
                     continue;
@@ -69,13 +69,14 @@ namespace TofProcesser {
                 {
                     Logger::instance().debug("Thread tof process - Successfully read raw data from MIPI");
                     
+                    for (int i = 0; i < 20; ++i)
                     {          
                         UdpDataPacket pkt;
-                        size_t dataLen = 2 * 2 * 16384 * sizeof(unsigned char);
-                        pkt.data.resize(dataLen);
+                        size_t singleFrameLen = 2 * 16384 * sizeof(unsigned char);
+                        pkt.data.resize(singleFrameLen);
                         pkt.type = UdpPacketType::TOF_IMAGE;
 
-                        memcpy(pkt.data.data(), static_cast<unsigned char*>(tofImg.ptr()), dataLen);
+                        memcpy(pkt.data.data(), static_cast<unsigned char*>(tofImg.ptr()) + i * singleFrameLen, singleFrameLen);
 
                         {
                             std::lock_guard<std::mutex> lock(g_udpMutex);
@@ -94,44 +95,11 @@ namespace TofProcesser {
                     std::this_thread::sleep_for(kComputeInterval - computationTime);
                 }
             }
-#if 0
             else if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD)
             {
-                bool hasNewData = false;
-                {
-                    std::unique_lock<std::shared_mutex> lock(g_sharedMat.matMutex);
-                    if (g_sharedMat.newDataAvailable)
-                    {
-                        memcpy(memBuffer.data(), g_sharedMat.sharedMat, memBuffer.size() * sizeof(uint16_t));
-                        g_sharedMat.newDataAvailable = false;
-                        hasNewData = true;
-                    }
-                }
-
-                if (!hasNewData)
-                {
-                    continue; 
-                }
-            
-                cv::Mat MatToProcess(128, 128, CV_16UC1, memBuffer.data());
-
-                if (!MatToProcess.empty())
-                {
-                    // 计算直方图并获取结果
-                    HistogramResult result = ComputeHistogram(MatToProcess, 1000, 50000);
-                    float computedistance = result.maxPixelValue / 10.0f;
-
-                    {
-                        g_sharedData.distance = computedistance;
-                        g_sharedData.occupancyRatio = result.occupancyRatio;
-                        g_sharedData.dataUpdated = true;
-                    }
-
-                    Logger::instance().info(("Thread ComputeDistance - Distance: " + std::to_string(computedistance) + " m, occupancy: " + std::to_string(result.occupancyRatio)).c_str());
-                }
+                // TODO 计算距离值并确定成像范围及参数
+                continue;
             }
-
-#endif
         }
     }
 }

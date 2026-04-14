@@ -53,10 +53,6 @@ LatestRingBuffer<UdpDataPacket, kPacketBufferSize> g_udpRing;
 std::mutex g_udpMutex;
 std::condition_variable g_udpCV;
 
-LatestRingBuffer<PcieDataPacket, kPacketBufferSize> g_pcieRing;
-std::mutex g_pcieMutex;
-std::condition_variable g_pcieCV;
-
 // 系统参数
 UartComm::SystemConfig g_sysConfig;
 UartComm::MotionData g_motionData;
@@ -81,7 +77,7 @@ void register_threads()
     std::thread depthProcess(PointCloud::thread_PointCloudProcess);
     depthProcess.detach();
 
-    std::thread tofProcess(TofProcesser::thread_ComputeDistance);
+    std::thread tofProcess(TofProcesser::thread_TofProcess);
     tofProcess.detach();
 
 

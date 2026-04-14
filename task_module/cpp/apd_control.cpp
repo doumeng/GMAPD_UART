@@ -250,7 +250,7 @@ int StrideLengthCtrl(int length)
 int ApdConstructFrameCtrl(int buffer_num)
 {
     // APD构建帧使能控制接口，buffer_num为1表示使能，0表示禁用
-    if (buffer_num < 0)
+    if (buffer_num < 4)
     {
         return -1; // 无效参数
     }

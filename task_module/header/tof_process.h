@@ -37,5 +37,5 @@ namespace TofProcesser {
     //     int Gatecount);
         
 
-    void thread_ComputeDistance();
+    void thread_TofProcess();
 }
