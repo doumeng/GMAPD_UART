@@ -87,7 +87,7 @@ namespace UdpComm {
         return true;
     }
 
-    bool UdpSender::sendData(const uint8_t* data, size_t length, uint32_t transfer_id, uint8_t task_type) {
+    bool UdpSender::sendData(const uint8_t* data, size_t length, uint32_t transfer_id, uint8_t task_type, int16_t pitch, int16_t yaw) {
         if (!data || length == 0) {
             Logger::instance().debug("sendData called with empty data or zero length");
             return false;
@@ -137,6 +137,8 @@ namespace UdpComm {
             frame.task_type = task_type;
             
             frame.fragment_idx = static_cast<uint8_t>(idx);
+            frame.pitch = pitch;
+            frame.yaw = yaw;
 
             memset(frame.data, 0, fragment_size);
             memcpy(frame.data, data + offset, frag_len);
@@ -148,7 +150,7 @@ namespace UdpComm {
                 Logger::instance().error(("UDP send failed at fragment idx=" + std::to_string(idx) + ", dropping remaining data.").c_str());
                 return false; // 只要有一帧发送失败，立即丢弃剩余数据
             }
-            sleep(0.001);
+            usleep(100);
         }
         
         return true;
@@ -169,7 +171,7 @@ namespace UdpComm {
             }
 
             UdpDataPacket pkt;
-            if (!g_udpRing.popLatest(pkt)) {
+            if (!g_udpRing.popFront(pkt)) {
                 lock.unlock();
                 continue;
             }
@@ -178,26 +180,17 @@ namespace UdpComm {
             task_id = (task_id + 1) % 0xFFFFFF;
 
             if (pkt.type == UdpPacketType::TOF_IMAGE && !pkt.data.empty()) {
-                udp_Sender.sendData(pkt.data.data(), pkt.data.size(), task_id, 1);
+                udp_Sender.sendData(pkt.data.data(), pkt.data.size(), task_id, 1, 0, 0);
             }
             else if (pkt.type == UdpPacketType::DEPTH_IMAGE) {
                 size_t pixel_count = pkt.rows * pkt.cols;
                 if (pkt.dist.size() == pixel_count && pkt.inten.size() == pixel_count && pkt.raw.size() == pixel_count) {
-                    uint32_t * data = interleaveArrays(pkt.dist.data(), pkt.inten.data(), pixel_count);
 
                     size_t data_size = pixel_count * sizeof(uint32_t);
                     size_t raw_data_size = pixel_count * sizeof(int32_t);
                     size_t total_size = data_size + raw_data_size;
 
-                    std::vector<uint8_t> combined_data(total_size);
-                    std::memcpy(combined_data.data(), data, data_size);
-                    std::memcpy(combined_data.data() + data_size, pkt.raw.data(), raw_data_size);
-
-                    // udp_Sender.sendData(combined_data.data(), total_size, task_id, 0);
-                    // udp_Sender.sendData(reinterpret_cast<uint8_t*>(data), data_size, task_id, 0);
-
-                    udp_Sender.sendData(reinterpret_cast<uint8_t*>(pkt.raw.data()), raw_data_size, task_id, 0);
-                    delete[] data;
+                    udp_Sender.sendData(reinterpret_cast<uint8_t*>(pkt.raw.data()), raw_data_size, task_id, 0, -1000, 1000);
                 } else {
                     Logger::instance().warning(("UDP data dropped due to size mismatch. Expected pixel_count: " + 
                         std::to_string(pixel_count) + ", dist.size: " + std::to_string(pkt.dist.size()) + 

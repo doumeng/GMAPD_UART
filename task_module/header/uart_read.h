@@ -45,20 +45,24 @@ namespace UartComm {
     {
         std::mutex mtx;
         std::condition_variable cv;
+
         bool updated = false;
 
-        uint8_t frameNum = 4;                             // 帧数
+        uint8_t frameNum = 5;                             // 帧数
 
-        int16_t stride = 4;                               // 系统配置
-        int16_t threshold = 2;                            // 阈值
+        int16_t stride = 3;                               // 系统配置
+        int16_t threshold = 3;                            // 阈值
 
-        uint8_t kernalSize = 3;                           // 核大小
+        uint8_t kernalSize = 15;                           // 核大小
 
         uint8_t denoiseLevel = 3;                         // 降噪等级
+
+        float distance = 0.0f;
         float minDistance = 0.0f;                         // 最小距离(m)
         float maxDistance = 6000.0f;                      // 最大距离(m)
+        
         float dbscanEps = 3.0f;                           // DBSCAN 邻域半径
-        uint16_t dbscanMinSamples = 7;                   // DBSCAN 最小样本数
+        uint16_t dbscanMinSamples = 5;                    // DBSCAN 最小样本数
     };
 
     // 弹体数据

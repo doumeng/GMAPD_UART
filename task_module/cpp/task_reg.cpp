@@ -42,10 +42,6 @@ std::string ip_address = "192.168.20.111";
 uint16_t udp_port = 10000;
 UdpComm::UdpSender udp_Sender(ip_address, udp_port);
 
-std::mutex g_stateMutex;
-std::condition_variable g_stateCV;
-std::atomic<bool> g_shutdown(false);
-
 // 推流环形缓冲区及同步原语
 constexpr size_t kPacketBufferSize = 5;
 
@@ -79,7 +75,6 @@ void register_threads()
 
     std::thread tofProcess(TofProcesser::thread_TofProcess);
     tofProcess.detach();
-
 
     while (true)
         std::this_thread::sleep_for(std::chrono::seconds(1));

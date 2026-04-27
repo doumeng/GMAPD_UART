@@ -11,7 +11,7 @@ void Pcie_Init(int inputChn, int outPutVencChn){
     depthImgChnAttr.modType = MOD_ID_XDMA_VIDEO;
     depthImgChnAttr.xdmaVideo.dev = 0;
     depthImgChnAttr.xdmaVideo.chn = inputChn;
-    depthImgChnAttr.xdmaVideo.timeOut = 0;
+    depthImgChnAttr.xdmaVideo.timeOut = -1;
 
     // imgChnInfo_S outModAttr;
     outModAttr.modType = MOD_ID_FPGA;
@@ -27,7 +27,7 @@ void Mipi_Init(int inputChn){
     tofImgChnAttr.modType = MOD_ID_VI;
     tofImgChnAttr.xdmaVideo.dev = 0;
     tofImgChnAttr.xdmaVideo.chn = inputChn;
-    tofImgChnAttr.xdmaVideo.timeOut = -1;
+    tofImgChnAttr.xdmaVideo.timeOut = -1; // 设置为1000ms超时，避免阻塞导致无法切模式
 
     return ;
 }

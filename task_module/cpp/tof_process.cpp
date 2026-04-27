@@ -9,96 +9,104 @@
 
 #include "tof_process.h"
 #include "apd_control.h"
+#include "img.h"
 
 namespace TofProcesser {
-    // // 计算直方图并返回统计结果 (支持14位图像)
-    // HistogramResult ComputeHistogram(const cv::Mat& image, int startValue, int endValue) {
-    //     // 检查是否为空图像
-    //     if (image.empty()) {
-    //         return {-1, -1, 0.0f};
-    //     }
 
-    //     // 设置直方图参数（只统计1000-50000范围内的像素值）
-    //     const int histSize = static_cast<int>((endValue - startValue + 1) / 1000);
-    //     const float range[] = {startValue, endValue+1};   // 上限值不包含
-    //     const float* histRange = {range};
+    float calculateDistanceFromTof(const uint16_t* tofData, size_t numPixels, int startValue, int endValue, int binWidth) {
+        if(!tofData || numPixels == 0) {
+            return 0.0f;
+        }
 
-    //     // 计算直方图
-    //     cv::Mat hist;
-    //     cv::calcHist(&image, 1, 0, cv::Mat(), hist, 1, &histSize, &histRange, true);
+        if (binWidth <= 0) binWidth = 1;
+        int numBins = (endValue - startValue) / binWidth + 1;
+        std::vector<int> hist(numBins, 0);
 
-    //     // 使用内置函数找到最大值及其位置
-    //     cv::Point maxLoc;
-    //     double maxValue;
-    //     cv::minMaxLoc(hist, nullptr, &maxValue, nullptr, &maxLoc);
+        int maxFreq = 0;
+        int bestBinIdx = -1;
 
-    //     // 计算非零像素占比，作为场景稀疏度指标
-    //     double nonZeroPixels = cv::countNonZero(image);
-    //     double totalPixels = static_cast<double>(image.total());
-    //     float occupancyRatio = (totalPixels > 0) ? static_cast<float>(nonZeroPixels / totalPixels) : 0.0f;
+        for (size_t i = 0; i < numPixels; ++i) {
+            uint16_t pixel = tofData[i];
 
-    //     // maxLoc.y 对应的是 bin 索引，实际像素值为 bin + startValue
-    //     return {maxLoc.y + startValue, static_cast<int>(maxValue), occupancyRatio};
-    // }
+            if (pixel >= startValue && pixel <= endValue) {
+                int binIdx = (pixel - startValue) / binWidth;
+                if (binIdx >= 0 && binIdx < numBins) {
+                    hist[binIdx]++;
+                    if (hist[binIdx] > maxFreq) {
+                        maxFreq = hist[binIdx];
+                        bestBinIdx = binIdx;
+                    }
+                }
+            }
+        }
+        
+        float targetDistance = 0.0f;
 
-    // 根据距离，计算需要的延迟时间
-    // int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount) {
-    //     int bincount = (TargetDistance * 2) / (0.3 * BinWidth); // 计算需要的bin数
-    //     int timeDelay = bincount - (bincount % Gatecount); // 计算实际延迟bin数
-    //     return timeDelay * 2;
-    // }
+        if (bestBinIdx != -1) {
+            int bestBinValue = 16000 - (startValue + bestBinIdx * binWidth) * 2;
+            targetDistance = (bestBinValue + g_sysConfig.enDelay) * 0.15f;
+        }
 
+        return targetDistance;
+    }
 
     void thread_TofProcess()
     {
-        constexpr auto kComputeInterval = std::chrono::milliseconds(1000); // 模拟1秒读取一次
+        constexpr auto kComputeInterval = std::chrono::milliseconds(20);
 
         while (1)
         {
-            auto computationStart = std::chrono::steady_clock::now();
+            auto start_time = std::chrono::steady_clock::now();
 
-            img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
-
-            if (g_sysConfig.workMode == UartComm::WorkMode::TEST)
+            size_t numPixels = 16384 * 20; // 20帧，每帧16384像素 
+            std::vector<uint16_t> tofDataCopy(numPixels);
+            
             {
-                if(tofImg.isEmptyFrame()){
-                    Logger::instance().debug("Thread tof process - Failed to read point cloud from MIPI");
+                img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
+
+                if(tofImg.isEmptyFrame()) {
                     continue;
                 }
-                else
+                std::memcpy(tofDataCopy.data(), tofImg.ptr(), numPixels * sizeof(uint16_t));
+            }
+
+            if (g_sysConfig.workMode == UartComm::WorkMode::TEST)
+            {   
                 {
-                    Logger::instance().debug("Thread tof process - Successfully read raw data from MIPI");
-                    
-                    for (int i = 0; i < 20; ++i)
-                    {          
-                        UdpDataPacket pkt;
-                        size_t singleFrameLen = 2 * 16384 * sizeof(unsigned char);
-                        pkt.data.resize(singleFrameLen);
-                        pkt.type = UdpPacketType::TOF_IMAGE;
+                    UdpDataPacket pkt;
+                    size_t dataLen = 2 * 128 * 128 * sizeof(uint16_t);
+                    pkt.data.resize(dataLen);
+                    pkt.type = UdpPacketType::TOF_IMAGE;
 
-                        memcpy(pkt.data.data(), static_cast<unsigned char*>(tofImg.ptr()) + i * singleFrameLen, singleFrameLen);
+                    memcpy(pkt.data.data(), reinterpret_cast<unsigned char*>(tofDataCopy.data()), dataLen);
 
-                        {
-                            std::lock_guard<std::mutex> lock(g_udpMutex);
-                            g_udpRing.push(std::move(pkt));
-                        }
-                        g_udpCV.notify_one();
+                    {
+                        std::lock_guard<std::mutex> lock(g_udpMutex);
+                        g_udpRing.push(std::move(pkt));
                     }
-                }
 
-                auto computationTime = std::chrono::steady_clock::now() - computationStart;
-                long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
-                Logger::instance().info(("Thread ComputeDistance - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
-
-                if (computationTime < kComputeInterval)
-                {
-                    std::this_thread::sleep_for(kComputeInterval - computationTime);
+                    g_udpCV.notify_one();
                 }
             }
+    
             else if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD)
             {
-                // TODO 计算距离值并确定成像范围及参数
-                continue;
+                float targetDistance = calculateDistanceFromTof(tofDataCopy.data(), numPixels);
+                {
+                    g_histConfig.distance = targetDistance;
+                    g_histConfig.maxDistance = targetDistance + 250;
+                    g_histConfig.minDistance = (targetDistance < 250) ? 0 : (targetDistance - 250);
+                }
+                Logger::instance().debug(("Thread TofProcess - Mode: STANDARD, Target Distance: " + std::to_string(targetDistance) + "m").c_str());
+            }
+
+            auto computationTime = std::chrono::steady_clock::now() - start_time;
+            long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
+            Logger::instance().debug(("Thread TofProcess - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
+
+            if (computationTime < kComputeInterval)
+            {
+                std::this_thread::sleep_for(kComputeInterval - computationTime);
             }
         }
     }

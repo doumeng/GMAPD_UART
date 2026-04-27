@@ -10,11 +10,13 @@
 
 #include <cstdint>
 #include <cmath>
+
+#include "peripheryApi.h"
 #include "log.h"
 
-int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount);
-uint16_t * createUint16Matrix(int rows, int cols);
-float * createFloatMatrix(int rows, int cols);
+extern periDev::Ltc2991Dev fpga_temp_dev ;
+extern periDev::Ltc2991Dev rk_temp_dev ;
+extern periDev::Ltc2991Dev air_temp_dev ;
 
-uint32_t * interleaveArrays(const float* floatArray, const uint16_t* intArray, size_t size);
-uint16_t * float2Uint16(const float *floatArray, size_t size);
+int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount);
+void initTemperatureSensors();

@@ -23,7 +23,7 @@
 
 namespace PointCloud {
 
-    // 1. 解析原始数据中的强度和距离，并将飞行时间转换为距离（*10 缩放存为 uint16）
+    // 1. 解析原始数据中的强度和距离，并将飞行时间转换为距离
     void parseDepthData(const uint32_t* rawData, int rows, int cols, int16_t offset,
                         cv::Mat& intenMat, cv::Mat& distMat);
 

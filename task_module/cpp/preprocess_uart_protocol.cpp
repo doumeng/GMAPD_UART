@@ -118,7 +118,9 @@ ReplyFrame buildReplyFrame(uint16_t sequence,
                            uint8_t temp_low,
                            uint8_t temp_high,
                            uint8_t volt_int,
-                           uint8_t volt_frac) {
+                           uint8_t volt_frac,
+                           uint8_t fpga_temp_low,
+                           uint8_t fpga_temp_high) {
     ReplyFrame reply;
 
     for (std::size_t i = 0; i < kFrameSize; ++i) {
@@ -145,6 +147,8 @@ ReplyFrame buildReplyFrame(uint16_t sequence,
     reply.raw[12] = temp_high;
     reply.raw[13] = volt_int;
     reply.raw[14] = volt_frac;
+    reply.raw[15] = fpga_temp_low;
+    reply.raw[16] = fpga_temp_high;
 
     const uint16_t fcs = calcFrameFcs(reply.raw);
     writeLe16(reply.raw.data() + kFcsLowIdx, fcs);

@@ -23,7 +23,7 @@ namespace UdpComm {
     constexpr uint16_t UDP_FRAME_HEADER = 0xAA55;
     constexpr uint16_t UDP_FRAME_TAIL   = 0x55AA;
     constexpr size_t   UDP_FRAME_DATA_LEN = 4096;
-    constexpr size_t   UDP_FRAME_TOTAL_LEN = 4108; // 2+2+4+1+4096+1+2
+    constexpr size_t   UDP_FRAME_TOTAL_LEN = 4112; // 2+2+3+1+1+2+2+4096+1+2
 
     struct UdpFrame {
         uint16_t header;         // 0xAA55
@@ -31,6 +31,8 @@ namespace UdpComm {
         uint8_t  transfer_id[3]; // Bytes 5-7 (offsets 4,5,6)
         uint8_t  task_type;      // Byte 8 (offset 7)
         uint8_t  fragment_idx;   // fragment index (0-15)
+        int16_t  pitch;          // pitch angle * 100
+        int16_t  yaw;            // yaw angle * 100
         uint8_t  data[UDP_FRAME_DATA_LEN]; // payload
         uint8_t  checksum;       // XOR of all bytes from header to data
         uint16_t tail;           // 0x55AA
@@ -42,7 +44,7 @@ namespace UdpComm {
             ~UdpSender();
 
             // 发送大数据，自动分片组帧
-            bool sendData(const uint8_t* data, size_t length, uint32_t transfer_id, uint8_t task_type);
+            bool sendData(const uint8_t* data, size_t length, uint32_t transfer_id, uint8_t task_type, int16_t pitch = 0, int16_t yaw = 0);
 
         private:
             int sockfd_;

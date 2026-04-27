@@ -33,6 +33,7 @@ public:
     void push(const T& item);
     void push(T&& item);
     bool popLatest(T& out);
+    bool popFront(T& out);
     bool hasData() const;
 
 private:
@@ -64,6 +65,17 @@ bool LatestRingBuffer<T, Capacity>::popLatest(T& out) {
     const size_t latestIndex = (m_writeIndex + Capacity - 1) % Capacity;
     out = m_buffer[latestIndex];
     m_count = 0;
+    return true;
+}
+
+template <typename T, size_t Capacity>
+bool LatestRingBuffer<T, Capacity>::popFront(T& out) {
+    if (m_count == 0) {
+        return false;
+    }
+    const size_t oldestIndex = (m_writeIndex + Capacity - m_count) % Capacity;
+    out = std::move(m_buffer[oldestIndex]);
+    m_count--;
     return true;
 }
 

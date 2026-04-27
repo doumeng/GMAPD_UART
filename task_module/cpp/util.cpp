@@ -6,8 +6,31 @@
  * @FilePath: /K253154_Preprocess_RK3588_0123/task_module/cpp/util.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
+
+#include <string>
+
+#include "peripheryApi.h"
 #include "util.h"
-#include <cstring>
+
+std::string fpga_temp_path = "/sys/class/hwmon/hwmon0/temp1_input";
+std::string rk_temp_path = "/sys/class/hwmon/hwmon0/temp2_input";
+std::string air_temp_path = "/sys/class/hwmon/hwmon0/temp5_input";
+
+periDev::Ltc2991Dev fpga_temp_dev = periDev::Ltc2991Dev(fpga_temp_path);
+periDev::Ltc2991Dev rk_temp_dev = periDev::Ltc2991Dev(rk_temp_path);
+periDev::Ltc2991Dev air_temp_dev = periDev::Ltc2991Dev(air_temp_path);
+
+void initTemperatureSensors() {
+    if (fpga_temp_dev.openDev() == 0) {
+        Logger::instance().error("Failed to open FPGA temperature sensor");
+    }
+    if (rk_temp_dev.openDev() == 0) {
+        Logger::instance().error("Failed to open RK temperature sensor");
+    }
+    if (air_temp_dev.openDev() == 0) {
+        Logger::instance().error("Failed to open Air temperature sensor");
+    }
+}
 
 // 根据距离，计算需要的延迟时间
 int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount) {
@@ -16,50 +39,4 @@ int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount) {
     // return timeDelay * 2;
     int delay = TargetDistance / 0.15f ;
     return delay;
-}
-
-// 创建128x128的uint16矩阵并初始化为0
-uint16_t *createUint16Matrix(int rows, int cols)
-{
-    uint16_t *matrix = new uint16_t[rows * cols];
-    memset(matrix, 0, rows * cols * sizeof(uint16_t));
-    return matrix;
-}
-
-// 创建128x128的uint16矩阵并初始化为0
-float *createFloatMatrix(int rows, int cols)
-{
-    float *matrix = new float[rows * cols];
-    memset(matrix, 0, rows * cols * sizeof(float));
-    return matrix;
-}
-
-uint16_t * float2Uint16(const float *floatArray, size_t size){
-    // 创建新数组（每个元素32位）
-    uint16_t *combined = new uint16_t[size];
-
-    for (size_t i = 0; i < size; ++i)
-    {
-        // 浮点数处理：保留1位小数→乘以10→截断小数部分→转为16位整数
-        uint16_t floatValue = static_cast<uint16_t>(trunc(floatArray[i] * 10.0f));
-        combined[i] = floatValue;
-    }
-    return combined; 
-}
-
-uint32_t *interleaveArrays(const float *floatArray, const uint16_t *intArray, size_t size)
-{
-    // 创建新数组（每个元素32位）
-    uint32_t *combined = new uint32_t[size];
-
-    for (size_t i = 0; i < size; ++i)
-    {
-        // 浮点数处理：保留1位小数→乘以10→截断小数部分→转为16位整数
-        uint16_t floatValue = static_cast<uint16_t>(trunc(floatArray[i] * 10.0f));
-
-        // 拼接：高位为深度，低位为强度
-        combined[i] = (static_cast<uint32_t>(floatValue) << 16) | intArray[i];
-    }
-
-    return combined; // 返回新数组首地址
 }

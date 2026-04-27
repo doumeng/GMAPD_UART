@@ -53,7 +53,9 @@ namespace PreprocessUart {
                                uint8_t temp_low,
                                uint8_t temp_high,
                                uint8_t volt_int,
-                               uint8_t volt_frac);
+                               uint8_t volt_frac,
+                               uint8_t fpga_temp_low,
+                               uint8_t fpga_temp_high);
     std::string frameToHex(const std::array<uint8_t, kFrameSize> &frame);
 
     void decodeTemperature(uint16_t temp, uint8_t &low, uint8_t &high);

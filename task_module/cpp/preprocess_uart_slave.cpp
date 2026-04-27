@@ -18,6 +18,7 @@
 #include "serial_utils.h"
 #include "task_reg.h"
 #include "util.h"
+#include "peripheryApi.h"
 
 #include "log.h"
 
@@ -101,13 +102,23 @@ namespace PreprocessUart {
 
             g_histConfig.stride = strideLength;
             g_histConfig.threshold = diffThreshold;
-            g_histConfig.kernalSize = kernalSize;
-            g_histConfig.denoiseLevel = denoiseLevel;
             g_histConfig.frameNum = constructFrame;
+            g_histConfig.denoiseLevel = denoiseLevel;
 
+            // 大于0以及值改变则更新
+            g_histConfig.kernalSize = kernalSize;
             g_histConfig.dbscanEps = denoiseLevel;
             g_histConfig.dbscanMinSamples = constructFrame;
 
+            // 打印算法参数设置结果
+            Logger::instance().info(" PreprocessUart Algorithm Parameters Set");
+
+            Logger::instance().info((" Kernel Size received: " + std::to_string(kernalSize)).c_str());
+            Logger::instance().info((" Kernel Size setting: " + std::to_string(g_histConfig.kernalSize)).c_str());
+            Logger::instance().info((" Eps received: " + std::to_string(denoiseLevel)).c_str());
+            Logger::instance().info((" Eps setting: " + std::to_string(g_histConfig.dbscanEps)).c_str());
+            Logger::instance().info((" Min Samples received: " + std::to_string(diffThreshold)).c_str());
+            Logger::instance().info((" Min Samples setting: " + std::to_string(g_histConfig.dbscanMinSamples)).c_str());
 #if 0
             {
                 ApdGatherEn(0);
@@ -131,14 +142,13 @@ namespace PreprocessUart {
                 Logger::instance().error("Failed to set difference threshold");
                 status = 1;
             }
-
             return status;
         }
 
         uint8_t DelaySetting(uint16_t distance) {
             int delay = ComputeDelay(distance, 2, 1000) / 5;
 
-            Logger::instance().info(("PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
+            Logger::instance().info((" PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
 
             EnDelayCtrl(delay);
             RecDelayCtrl(delay + 1);
@@ -191,17 +201,16 @@ namespace PreprocessUart {
             }
 
             if (outputMode == 0) {
-                // 输出depth
-                if (PcieChlCtrl(1))
-                {
-                    Logger::instance().error("Failed to set PCIe channel control");
-                    return 1;
-                }
                 g_sysConfig.workMode = UartComm::WorkMode::STANDARD;
             } else {
                 // 输出tof
                 g_sysConfig.workMode = UartComm::WorkMode::TEST;
             }
+
+            // 打印算法参数设置结果
+            Logger::instance().info(" ApdStateSetting Algorithm Parameters Set");
+            Logger::instance().info((" Trigger mode: " + std::to_string(static_cast<int>(g_sysConfig.triggerMode))).c_str());
+            Logger::instance().info((" Work Mode: " + std::to_string(static_cast<int>(g_sysConfig.workMode))).c_str());
 
             return 0;
         }
@@ -222,7 +231,7 @@ namespace PreprocessUart {
                         Logger::instance().info("PreprocessUart APD Start: Stage 1V8_5V");
 
                         SecondVoltageCtrl();
-
+        
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::STARTING_1V8_5V_WAIT;
                     }
@@ -234,6 +243,9 @@ namespace PreprocessUart {
                         
                         ApdStateSetting(0); // 下发默认参数，开始输出图像
                         g_stateCache.ctl_para = 0;
+
+                        // 输出depth
+                        PcieChlCtrl(1);
 
                         lastApdStateTime = std::chrono::steady_clock::now();
                         currentApdState = ApdPowerState::STARTING_30V;
@@ -604,14 +616,19 @@ namespace PreprocessUart {
 
             // 3. 发送周期应答，获取电压及温度，根据电压值和读取温敏电阻并解析；
 
-            uint8_t tempLow = 0, tempHigh = 0, voltLow = 0, voltHigh = 0;
+            uint8_t coolerTempLow = 0, coolerTempHigh = 0, voltLow = 0, voltHigh = 0, fpgaTempLow = 0, fpgaTempHigh = 0;
 
             decodeVoltage(g_sysConfig.biasVoltage, voltLow, voltHigh);
 
-            uint16_t tempValue = Cooler::getCoolerTemperature();
-            decodeTemperature(tempValue, tempLow, tempHigh);
+            uint16_t tempValue = Cooler::getCoolerTemperature(); // 制冷机温度除以10得到原始温度
+            decodeTemperature(tempValue, coolerTempLow, coolerTempHigh);
             Logger::instance().debug(("PreprocessUart Cooler Temperature: " + std::to_string(static_cast<float>(tempValue) / 10.0f) + "K").c_str());
             
+
+            uint16_t fpgaTemp = fpga_temp_dev.getAdc() / 100.0f; // FPGA温度除以1000得到原始温度，此处除以100是为了保持统一的协议，传输数值为原始温度乘以10；
+            decodeTemperature(fpgaTemp, fpgaTempLow, fpgaTempHigh);
+            Logger::instance().debug(("PreprocessUart fpga Temperature ADC: " + std::to_string(fpgaTemp/10.0f)).c_str());
+
             // 版本号固定下发：高四位大版本，低四位小版本
             uint8_t major_version = 1;
             uint8_t minor_version = 0;
@@ -629,8 +646,10 @@ namespace PreprocessUart {
                                                g_ctl_para_status, 
                                                g_algo_para_status, 
                                                current_power_status, 
-                                               tempLow, tempHigh, 
-                                               voltLow, voltHigh);
+                                               coolerTempLow, coolerTempHigh, 
+                                               voltLow, voltHigh,
+                                               fpgaTempLow, fpgaTempHigh);
+                                               
             std::vector<uint8_t> txData(reply.raw.begin(), reply.raw.end());
             
             Logger::instance().debug(("PreprocessUart Sending reply frame: " + frameToHex(reply.raw)).c_str());
