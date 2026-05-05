@@ -1,0 +1,10 @@
+binOutput/
+参考文档/
+.github/
+mcp-server/
+cmake-build-debug*/
+lib/
+include/
+build/
+.idea/
+.vscode/

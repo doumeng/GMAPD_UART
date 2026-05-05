@@ -1,0 +1,81 @@
+/*
+ * @Author: doumeng 1159898567@qq.com
+ * @Date: 2026-03-17 19:36:19
+ * @LastEditors: doumeng 1159898567@qq.com
+ * @LastEditTime: 2026-03-31 09:54:30
+ * @FilePath: /GMAPD_UART/task_module/cpp/task_reg.cpp
+ * @Description: 通信线程 点云处理线程 tof处理 udp发送 PCIE发送 线程注册
+ */
+#include "task_reg.h"
+
+// 1. C 标准库 (C++封装)
+#include <cmath>
+#include <cstdio>
+#include <cstdint>
+#include <cstring>
+#include <ctime>
+
+// 2. C++ 标准库
+#include <algorithm>
+#include <array>
+#include <condition_variable>
+#include <fstream>
+#include <mutex>
+#include <shared_mutex>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
+// 3. 本项目其他头文件
+#include "apd_control.h"
+#include "cooler_control.h"
+#include "log.h"
+#include "depth_process.h"
+#include "tof_process.h"
+#include "preprocess_uart_slave.h"
+#include "uart_read.h"
+
+// UDP 发送器实例
+std::string ip_address = "192.168.20.111";
+uint16_t udp_port = 10000;
+UdpComm::UdpSender udp_Sender(ip_address, udp_port);
+
+// 推流环形缓冲区及同步原语
+constexpr size_t kPacketBufferSize = 5;
+
+LatestRingBuffer<UdpDataPacket, kPacketBufferSize> g_udpRing;
+std::mutex g_udpMutex;
+std::condition_variable g_udpCV;
+
+// 系统参数
+UartComm::SystemConfig g_sysConfig;
+UartComm::MotionData g_motionData;
+UartComm::HistConfig g_histConfig;
+
+void register_threads()
+{
+
+    Logger::instance().("Registering and starting threads");
+    
+    std::string coolerDevicePath = "/dev/ttyS2"; 
+    Cooler::initCooler(coolerDevicePath, 4800);
+
+    std::string devicePath = "/dev/ttyS3";
+    std::thread uartComm(PreprocessUart::thread_Uart_Communication, 
+                         devicePath,  115200,  200);              
+    uartComm.detach();
+    
+    std::thread udpSend(UdpComm::thread_UdpSend);
+    udpSend.detach();
+
+    std::thread depthProcess(PointCloud::thread_PointCloudProcess);
+    depthProcess.detach();
+
+    std::thread tofProcess(TofProcesser::thread_TofProcess);
+    tofProcess.detach();
+
+    while (true)
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+}
