@@ -2,7 +2,7 @@
  * @Author: doumeng 1159898567@qq.com
  * @Date: 2026-01-27 09:00:23
  * @LastEditors: Do not edit
- * @LastEditTime: 2026-05-05 23:31:27
+ * @LastEditTime: 2026-05-06 11:43:29
  * @FilePath: \GMAPD_UART\main.cpp
  * @Description: 程序入口，负责系统初始化及log系统初始化
  */
@@ -48,8 +48,8 @@ int main()
     }
 
     // APD时序初始化
-    status = ApdControl(1, 2000, 40, 19600, 200, 0, 1600, 40, 4, 1600);
-    // status = ApdControl(1, 2000, 40, 19600, 200, 0, 1600, 1, 3, 2688);
+    // status = ApdControl(1, 2000, 40, 19600, 200, 0, 1600, 40, 4, 1600);
+    status = ApdControl(1, 2000, 40, 19600, 200, 0, 3200, 1, 3, 1600);
     // status = ApdControl(1, 2000, 40, 37592, 200, 0, 3200, 2, 3, 1600);
     
     if (status != 0) {
