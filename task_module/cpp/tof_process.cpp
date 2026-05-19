@@ -1,9 +1,9 @@
 /*
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2026-01-27 09:00:23
- * @LastEditors: doumeng 1159898567@qq.com
- * @LastEditTime: 2026-03-23 16:23:37
- * @FilePath: /GMAPD_RK3588/task_module/cpp/compute_distance.cpp
+ * @LastEditors: Do not edit
+ * @LastEditTime: 2026-05-18 16:43:23
+ * @FilePath: \GMAPD_UART\task_module\cpp\tof_process.cpp
  * @Description: tof 处理线程
  */
 
@@ -97,6 +97,13 @@ namespace TofProcesser {
                     g_histConfig.maxDistance = targetDistance + 250;
                     g_histConfig.minDistance = (targetDistance < 250) ? 0 : (targetDistance - 250);
                 }
+                
+                if (targetDistance > 0)
+                {
+                    DelaySetting(static_cast<uint16_t>(targetDistance));
+                    g_sysConfig.distance = targetDistance;
+                }
+               
                 Logger::instance().debug(("Thread TofProcess - Mode: STANDARD, Target Distance: " + std::to_string(targetDistance) + "m").c_str());
             }
 

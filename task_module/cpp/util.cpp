@@ -1,9 +1,9 @@
 /*
  * @Author: error: error: git config user.name & please set dead value or install git && error: git config user.email & please set dead value or install git & please set dead value or install git
  * @Date: 2026-01-23 09:31:42
- * @LastEditors: doumeng 1159898567@qq.com
- * @LastEditTime: 2026-03-26 19:39:02
- * @FilePath: /K253154_Preprocess_RK3588_0123/task_module/cpp/util.cpp
+ * @LastEditors: Do not edit
+ * @LastEditTime: 2026-05-18 16:52:51
+ * @FilePath: \GMAPD_UART\task_module\cpp\util.cpp
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 
@@ -34,9 +34,10 @@ void initTemperatureSensors() {
 
 // 根据距离，计算需要的延迟时间
 int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount) {
-    // int bincount = (TargetDistance * 2) / (0.3 * BinWidth); // 计算需要的bin数
-    // int timeDelay = bincount - (bincount % Gatecount); // 计算实际延迟bin数
-    // return timeDelay * 2;
-    int delay = TargetDistance / 0.15f ;
-    return delay;
+    int bincount = (TargetDistance * 2) / (0.3 * BinWidth); // 计算需要的bin数
+    int timeDelay = bincount - (bincount % Gatecount); // 计算实际延迟bin数
+    return timeDelay * 2;
+ 
+    // int delay = TargetDistance / 0.15f ;
+    // return delay;
 }
