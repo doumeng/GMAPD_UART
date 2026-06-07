@@ -1,9 +1,9 @@
 /*
  * @Author: doumeng 1159898567@qq.com
  * @Date: 2026-03-17 15:50:09
- * @LastEditors: doumeng 1159898567@qq.com
- * @LastEditTime: 2026-03-27 14:36:37
- * @FilePath: /GMAPD_RK3588/task_module/header/preprocess_uart_protocol.h
+ * @LastEditors: Do not edit
+ * @LastEditTime: 2026-05-25 11:15:37
+ * @FilePath: \GMAPD_UART\task_module\header\preprocess_uart_protocol.h
  * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
  */
 #pragma once
@@ -19,6 +19,7 @@ namespace PreprocessUart {
     constexpr std::size_t kFrameSize = 32;
     constexpr uint8_t kFlagByte = 0xBA;
 
+    // 串口获取的指令帧结构体
     struct CommandFrame {
         std::array<uint8_t, kFrameSize> raw{};
         uint16_t sequence = 0;          // 5-6 (Idx 4-5)
@@ -31,6 +32,8 @@ namespace PreprocessUart {
         uint16_t distance = 0;          // 14-15 (Idx 13-14)
         uint16_t velocity = 0;          // 16-17 (Idx 15-16)
         uint16_t temp_ctl = 0;          // 18-19 (Idx 17-18)
+        uint8_t test_mode = 0;          // 20  (Idx 19) - 0：测试指令无效 1：测试指令有效，响应完备以及低功耗指令  
+        uint8_t complete_status = 0;       // 21 (Idx 20) - 0：低功耗 1：完备  
     };
 
     struct ReplyFrame {
@@ -55,7 +58,9 @@ namespace PreprocessUart {
                                uint8_t volt_int,
                                uint8_t volt_frac,
                                uint8_t fpga_temp_low,
-                               uint8_t fpga_temp_high);
+                               uint8_t fpga_temp_high,
+                               uint8_t complete_status);
+
     std::string frameToHex(const std::array<uint8_t, kFrameSize> &frame);
 
     void decodeTemperature(uint16_t temp, uint8_t &low, uint8_t &high);

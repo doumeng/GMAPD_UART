@@ -34,6 +34,7 @@ namespace Cooler {
     uint8_t clearError();                  // 清除错误
     uint8_t saveConfig();
     uint8_t setTargetTemp(uint16_t tempK);    // 设置目标温度，单位K
+    uint16_t getTargetTemp();               // 获取目标温度，单位K
     uint16_t getCoolerTemperature();          // 独立获取制冷机温度（冷头）
     
     // 交互式测试

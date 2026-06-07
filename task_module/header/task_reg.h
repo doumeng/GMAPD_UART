@@ -11,6 +11,7 @@
 
 // 1. C/C++ 标准库
 #include <atomic>
+#include <array>
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
@@ -30,6 +31,23 @@ extern UartComm::HistConfig g_histConfig;
 extern LatestRingBuffer<UdpDataPacket, 5> g_udpRing;
 extern std::mutex g_udpMutex;
 extern std::condition_variable g_udpCV;
+
+struct LaserFrameShared {
+	static constexpr std::size_t kRows = 128;
+	static constexpr std::size_t kCols = 128;
+	static constexpr std::size_t kPixelCount = kRows * kCols;
+
+	std::array<uint16_t, kPixelCount> inten{};
+	std::array<float, kPixelCount> dist{};
+	int rows = static_cast<int>(kRows);
+	int cols = static_cast<int>(kCols);
+	uint64_t frameSeq = 0;
+	bool valid = false;
+};
+
+extern LaserFrameShared g_laserFrameShared;
+extern std::mutex g_laserFrameMutex;
+extern std::condition_variable g_laserFrameCV;
 
 extern UdpComm::UdpSender udp_Sender;
 

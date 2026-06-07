@@ -1,9 +1,9 @@
 /*
  * @Author: doumeng
  * @Date: 2025-05-30 19:52:42
- * @LastEditors: doumeng 1159898567@qq.com
- * @LastEditTime: 2026-03-21 16:02:31
- * @FilePath: uart_read.h
+ * @LastEditors: Do not edit
+ * @LastEditTime: 2026-05-19 15:32:02
+ * @FilePath: \GMAPD_UART\task_module\header\uart_read.h
  * @Description: 读取串口信息并解析至对应的结构体
 */
 
@@ -39,6 +39,8 @@ namespace UartComm {
         float timeResolution = 2.0f;                     // 时间分辨率(ns)
         float biasVoltage = 0.0f;                        // 电压(V)
         int16_t enDelay = 0;                             // 开门延迟（ns）
+        uint8_t laserGear = 0;                           // 激光挡位(0-3)
+        float laserEnergy = 0.0f;                        // 激光能量(占位值)
     };
 
     struct HistConfig
@@ -53,7 +55,7 @@ namespace UartComm {
         int16_t stride = 3;                               // 系统配置
         int16_t threshold = 3;                            // 阈值
 
-        uint8_t kernalSize = 3;                           // 核大小
+        uint8_t kernalSize = 1;                           // 核大小
 
         uint8_t denoiseLevel = 3;                         // 降噪等级
 

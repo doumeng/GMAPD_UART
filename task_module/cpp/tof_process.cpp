@@ -11,6 +11,7 @@
 #include "apd_control.h"
 #include "img.h"
 
+
 namespace TofProcesser {
 
     float calculateDistanceFromTof(const uint16_t* tofData, size_t numPixels, int startValue, int endValue, int binWidth) {
@@ -90,7 +91,7 @@ namespace TofProcesser {
             }
     
             else if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD)
-            {
+            { 
                 float targetDistance = calculateDistanceFromTof(tofDataCopy.data(), numPixels);
                 {
                     g_histConfig.distance = targetDistance;
@@ -98,23 +99,23 @@ namespace TofProcesser {
                     g_histConfig.minDistance = (targetDistance < 250) ? 0 : (targetDistance - 250);
                 }
                 
-                if (targetDistance > 0)
-                {
-                    DelaySetting(static_cast<uint16_t>(targetDistance));
-                    g_sysConfig.distance = targetDistance;
-                }
+                // if (targetDistance > 0)
+                // {
+                //     DelaySetting(static_cast<uint16_t>(targetDistance));
+                //     g_histConfig.distance = targetDistance;
+                // }
                
                 Logger::instance().debug(("Thread TofProcess - Mode: STANDARD, Target Distance: " + std::to_string(targetDistance) + "m").c_str());
             }
 
-            auto computationTime = std::chrono::steady_clock::now() - start_time;
-            long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
-            Logger::instance().debug(("Thread TofProcess - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
+            // auto computationTime = std::chrono::steady_clock::now() - start_time;
+            // long long duration_ms = std::chrono::duration_cast<std::chrono::milliseconds>(computationTime).count();
+            // Logger::instance().debug(("Thread TofProcess - Computation time: " + std::to_string(duration_ms) + "ms").c_str());
 
-            if (computationTime < kComputeInterval)
-            {
-                std::this_thread::sleep_for(kComputeInterval - computationTime);
-            }
+            // if (computationTime < kComputeInterval)
+            // {
+            //     std::this_thread::sleep_for(kComputeInterval - computationTime);
+            // }
         }
     }
 }

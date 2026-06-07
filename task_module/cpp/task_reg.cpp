@@ -33,6 +33,7 @@
 #include "cooler_control.h"
 #include "log.h"
 #include "depth_process.h"
+#include "laser_energy_process.h"
 #include "tof_process.h"
 #include "preprocess_uart_slave.h"
 #include "uart_read.h"
@@ -49,6 +50,10 @@ LatestRingBuffer<UdpDataPacket, kPacketBufferSize> g_udpRing;
 std::mutex g_udpMutex;
 std::condition_variable g_udpCV;
 
+LaserFrameShared g_laserFrameShared;
+std::mutex g_laserFrameMutex;
+std::condition_variable g_laserFrameCV;
+
 // 系统参数
 UartComm::SystemConfig g_sysConfig;
 UartComm::MotionData g_motionData;
@@ -56,8 +61,7 @@ UartComm::HistConfig g_histConfig;
 
 void register_threads()
 {
-
-    Logger::instance().("Registering and starting threads");
+    Logger::instance().info("Registering and starting threads");
     
     std::string coolerDevicePath = "/dev/ttyS2"; 
     Cooler::initCooler(coolerDevicePath, 4800);
@@ -72,6 +76,9 @@ void register_threads()
 
     std::thread depthProcess(PointCloud::thread_PointCloudProcess);
     depthProcess.detach();
+
+    std::thread laserEnergyProcess(LaserEnergy::thread_LaserEnergyProcess);
+    laserEnergyProcess.detach();
 
     std::thread tofProcess(TofProcesser::thread_TofProcess);
     tofProcess.detach();
