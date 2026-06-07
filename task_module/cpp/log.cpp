@@ -40,18 +40,18 @@ void Logger::init(const std::string& filename) {
     }
 
     // 清空目录下的其他常规文件
-    DIR* dir = opendir(outputDir.c_str());
-    if (dir != nullptr) {
-        struct dirent* ent;
-        while ((ent = readdir(dir)) != nullptr) {
-            std::string fileName = ent->d_name;
-            if (fileName != "." && fileName != ".." && ent->d_type == DT_REG) {
-                std::string filePath = outputDir + fileName;
-                remove(filePath.c_str());
-            }
-        }
-        closedir(dir);
-    }
+    // DIR* dir = opendir(outputDir.c_str());
+    // if (dir != nullptr) {
+    //     struct dirent* ent;
+    //     while ((ent = readdir(dir)) != nullptr) {
+    //         std::string fileName = ent->d_name;
+    //         if (fileName != "." && fileName != ".." && ent->d_type == DT_REG) {
+    //             std::string filePath = outputDir + fileName;
+    //             remove(filePath.c_str());
+    //         }
+    //     }
+    //     closedir(dir);
+    // }
 
     // 获取当前时间，生成唯一日志文件名
     time_t now = time(nullptr);

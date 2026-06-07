@@ -83,6 +83,7 @@ namespace Cooler {
             snprintf(buf, sizeof(buf), "%02X ", b);
             frame_str += buf;
         }
+        
         Logger::instance().debug(("Sent command to cooler: " + frame_str).c_str());
         
         // 50ms 超时接收
@@ -98,6 +99,7 @@ namespace Cooler {
             snprintf(buf, sizeof(buf), "%02X ", b);
             rx_frame_str += buf;
         }
+
         Logger::instance().debug(("Received response from cooler: " + rx_frame_str).c_str());
         
         uint8_t rx_cmd_code;
@@ -107,7 +109,12 @@ namespace Cooler {
              return 0;
         }
 
-        return 1;
+        if (rx_params == params) {
+            Logger::instance().debug("Cooler command executed successfully!");
+            return 1; // 成功
+        } 
+        
+        return 0;
     }
 
     uint16_t getCoolerTemperature() {
@@ -160,6 +167,59 @@ namespace Cooler {
 
         Logger::instance().error("Unexpected response for cooler temperature!");
         return 0;
+    }
+
+    uint16_t getTargetTemp() {
+        std::lock_guard<std::mutex> lock(g_serialMutex);
+        if (!g_serial) {
+            Logger::instance().error("Cooler serial not initialized!");
+            return 0;
+        }
+
+        std::vector<uint8_t> params = {0x01}; // 索引1(目标温度), 读取1个参数
+        auto frame = pack_frame(static_cast<uint8_t>(CmdType::READ_CFG_PARAM), params);
+        SerialUtils::write_frame(g_serial, frame);
+        
+        std::string frame_str;
+        for (auto b : frame) {
+            char buf[4];
+            snprintf(buf, sizeof(buf), "%02X ", b);
+            frame_str += buf;
+        }
+        Logger::instance().debug(("Sent command to cooler: " + frame_str).c_str());
+        
+        // 50ms 超时接收
+        auto rx_frame = SerialUtils::read_frame_by_boundary(g_serial, START_BYTE, END_BYTE, 1000);
+
+        if (rx_frame.empty()) {
+            Logger::instance().error("Read cooler target temperature timeout!");
+            return 2530;
+        }
+
+        uint8_t rx_cmd_code;
+        std::vector<uint8_t> rx_params;
+        if (!unpack_frame(rx_frame, rx_cmd_code, rx_params)) {
+             Logger::instance().error("Failed to unpack cooler temperature response!");
+             return 2530;
+        }
+
+        std::string rx_frame_str;
+        for (auto b : rx_frame) {
+            char buf[4];
+            snprintf(buf, sizeof(buf), "%02X ", b);
+            rx_frame_str += buf;
+        }
+        Logger::instance().debug(("Received response from cooler: " + rx_frame_str).c_str());
+
+        if (rx_cmd_code == static_cast<uint8_t>(CmdType::RET_CFG_PARAM)) {
+            if (rx_params.size() == 3 && rx_params[0] == 0x01) {
+                uint16_t raw_temp = rx_params[1] | (static_cast<uint16_t>(rx_params[2]) << 8);
+                return raw_temp;
+            }
+        }
+
+        Logger::instance().error("Unexpected response for cooler target temperature!");
+        return 2530;
     }
 
     uint8_t startCooler() {

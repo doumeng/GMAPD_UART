@@ -168,7 +168,7 @@ namespace PointCloud {
         }
     }
 
-    //备份填充函数
+    // 备份填充函数
     template<typename T>
     void FillSmallHoles(const T* src, T* dst, int rows, int cols, int max_hole_area)
     {
@@ -231,6 +231,7 @@ namespace PointCloud {
         memcpy(dst, filled.data, rows * cols * sizeof(T));
     }
 
+    // 膨胀操作
     template<typename T>
     void FillHolesDilate(const T* src, T* dst, int rows, int cols, int kernal_size)
     {
@@ -250,13 +251,35 @@ namespace PointCloud {
             }
         }
     }
+    
+    // 先腐蚀后膨胀
+    template<typename T>
+    void FillHolesErodeAndDilate(const T* src, T* dst, int rows, int cols, int kernal_size)
+    {
+        cv::Mat src_mat(rows, cols, cv::DataType<T>::type, const_cast<T*>(src));
+        cv::Mat eroded, dilated;
+
+        cv::Mat eroded_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(kernal_size, kernal_size));
+        cv::Mat dilated_kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(kernal_size, kernal_size*2));
+
+        cv::erode(src_mat, eroded, eroded_kernel);
+        cv::dilate(eroded, dilated, dilated_kernel);
+        
+        const T* dilated_data = reinterpret_cast<const T*>(dilated.data);
+        for (int i = 0; i < rows * cols; ++i) {
+            if (src[i] == static_cast<T>(0)) {
+                dst[i] = dilated_data[i];
+            } else if (src != dst) {
+                dst[i] = src[i];
+            }
+        }
+    }
 
     // 3. 对强度图和距离图执行膨胀操作，填补空洞
     void morphologicalFilter(const cv::Mat &intenIn, const cv::Mat &distIn,
                              cv::Mat &intenOut, cv::Mat &distOut, uint8_t kSize) {
         intenOut.create(intenIn.size(), CV_16UC1);
         distOut.create(distIn.size(), CV_32FC1);
-        
 
         if (kSize > 5){
             FillSmallHoles<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
@@ -266,11 +289,21 @@ namespace PointCloud {
                                  reinterpret_cast<float*>(distOut.data),
                                  distIn.rows, distIn.cols, 64);
         }else{
-            FillHolesDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
+            // 非模拟器场景
+            // FillHolesDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
+            //                        reinterpret_cast<uint16_t*>(intenOut.data),
+            //                        intenIn.rows, intenIn.cols, kSize);
+                                  
+            // FillHolesDilate<float>(reinterpret_cast<const float*>(distIn.data),
+            //                        reinterpret_cast<float*>(distOut.data),
+            //                        distIn.rows, distIn.cols, kSize);
+
+            // 模拟器场景
+            FillHolesErodeAndDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
                                    reinterpret_cast<uint16_t*>(intenOut.data),
                                    intenIn.rows, intenIn.cols, kSize);
                                   
-            FillHolesDilate<float>(reinterpret_cast<const float*>(distIn.data),
+            FillHolesErodeAndDilate<float>(reinterpret_cast<const float*>(distIn.data),
                                    reinterpret_cast<float*>(distOut.data),
                                    distIn.rows, distIn.cols, kSize);
         }
@@ -322,11 +355,14 @@ namespace PointCloud {
         
         parseDepthData(rawData, rows, cols, offset, intenMat, distMat);
 
+#if 0 // 距离像过滤
         Logger::instance().debug(("Thread PointCloudProcess - denoiseByDistance: " + std::to_string(g_histConfig.minDistance) + "m to "
         + std::to_string(g_histConfig.maxDistance) + "m").c_str());
 
         denoiseByDistance(intenMat, distMat, g_histConfig.minDistance, g_histConfig.maxDistance);
+#endif
 
+        // dbscan过滤
         if (g_histConfig.dbscanEps > 0 && g_histConfig.dbscanMinSamples > 0)
         {
             Logger::instance().debug(("Thread PointCloudProcess - denoiseByDbscanOpen3D - Running DBSCAN with eps: " +
@@ -339,7 +375,7 @@ namespace PointCloud {
 
         cv::Mat intenFiltered, distFiltered;
 
-#if 1
+#if 1 // 形态学操作
         if (g_histConfig.kernalSize > 0) {
             morphologicalFilter(intenMat, distMat, intenFiltered, distFiltered, g_histConfig.kernalSize);
         } else 
@@ -411,8 +447,27 @@ namespace PointCloud {
                         uint32_t* rawData = reinterpret_cast<uint32_t *>(depthImg.ptr());
                         processDenoisedDepthImage(rawData, udpPkt.rows, udpPkt.cols, g_sysConfig.enDelay, udpPkt);
 #endif
+                        // LVDS输出
                         img::imgWrite(outModAttr, udpPkt.raw.data(),  2 * udpPkt.rows * udpPkt.cols * sizeof(uint16_t)); // 每个像素 4 字节 (强度+距离)
+                        
+                        // 内部共享内存更新
+                        {
+                            std::lock_guard<std::mutex> laserLock(g_laserFrameMutex);
+                            const std::size_t pixelCount = std::min<std::size_t>(
+                                    udpPkt.inten.size(), LaserFrameShared::kPixelCount);
 
+                            std::copy_n(udpPkt.inten.begin(), pixelCount, g_laserFrameShared.inten.begin());
+                            std::copy_n(udpPkt.dist.begin(), pixelCount, g_laserFrameShared.dist.begin());
+
+                            g_laserFrameShared.rows = udpPkt.rows;
+                            g_laserFrameShared.cols = udpPkt.cols;
+                            ++g_laserFrameShared.frameSeq;
+                            g_laserFrameShared.valid = true;
+                        }
+
+                        g_laserFrameCV.notify_one();
+
+                        // UDP发送
                         {
                             std::lock_guard<std::mutex> lock(g_udpMutex);
                             g_udpRing.push(std::move(udpPkt));

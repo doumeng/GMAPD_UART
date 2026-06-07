@@ -18,6 +18,7 @@
 #include "log.h"
 #include "task_reg.h"
 #include "img.h"
+#include "preprocess_uart_slave.h"
 
 namespace TofProcesser {
     // 直方图统计结果结构体
@@ -35,6 +36,5 @@ namespace TofProcesser {
     // 计算TOF场景距离(返回m)
     float calculateDistanceFromTof(const uint16_t* tofData, size_t numPixels, int startValue = 200, int endValue = 7800, int binWidth = 10);
         
-
     void thread_TofProcess();
 }

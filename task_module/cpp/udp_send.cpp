@@ -294,7 +294,7 @@ namespace UdpComm {
             auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - reportStart).count();
             if (elapsedMs >= 1000) {
                 double sec = static_cast<double>(elapsedMs) / 1000.0;
-                Logger::instance().info((
+                Logger::instance().debug((
                     "UdpSendStats "
                     "dequeued=" + std::to_string(dequeuedPackets) +
                     ", depth_pkt=" + std::to_string(depthPackets) +
