@@ -32,12 +32,11 @@ extern LatestRingBuffer<UdpDataPacket, 5> g_udpRing;
 extern std::mutex g_udpMutex;
 extern std::condition_variable g_udpCV;
 
-struct LaserFrameShared {
+struct DistanceFrameShared {
 	static constexpr std::size_t kRows = 128;
 	static constexpr std::size_t kCols = 128;
 	static constexpr std::size_t kPixelCount = kRows * kCols;
 
-	std::array<uint16_t, kPixelCount> inten{};
 	std::array<float, kPixelCount> dist{};
 	int rows = static_cast<int>(kRows);
 	int cols = static_cast<int>(kCols);
@@ -45,9 +44,11 @@ struct LaserFrameShared {
 	bool valid = false;
 };
 
-extern LaserFrameShared g_laserFrameShared;
-extern std::mutex g_laserFrameMutex;
-extern std::condition_variable g_laserFrameCV;
+extern DistanceFrameShared g_distanceFrameShared;
+extern std::mutex g_distanceFrameMutex;
+extern std::condition_variable g_distanceFrameCV;
+extern std::atomic_bool g_trackingEnabled;
+extern std::atomic<std::uint64_t> g_trackingGeneration;
 
 extern UdpComm::UdpSender udp_Sender;
 

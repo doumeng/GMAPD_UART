@@ -32,8 +32,9 @@ namespace PreprocessUart {
         uint16_t distance = 0;          // 14-15 (Idx 13-14)
         uint16_t velocity = 0;          // 16-17 (Idx 15-16)
         uint16_t temp_ctl = 0;          // 18-19 (Idx 17-18)
-        uint8_t test_mode = 0;          // 20  (Idx 19) - 0：测试指令无效 1：测试指令有效，响应完备以及低功耗指令  
-        uint8_t complete_status = 0;       // 21 (Idx 20) - 0：低功耗 1：完备  
+        uint8_t test_mode = 0;          // 20  (Idx 19) - 0：测试指令无效 1：测试指令有效，响应完备以及低功耗指令
+        uint8_t complete_status = 0;       // 21 (Idx 20) - 0：低功耗 1：完备
+        uint8_t tracking_status = 0;     // 22 (Idx 21) - 0：未跟踪 1：跟踪
     };
 
     struct ReplyFrame {
@@ -42,11 +43,11 @@ namespace PreprocessUart {
 
     uint16_t calcFcs16(const uint8_t *data, std::size_t len);
     uint16_t calcFrameFcs(const std::array<uint8_t, kFrameSize> &frame);
-    
+
     bool decodeCommandFrame(const std::array<uint8_t, kFrameSize> &raw,
                             CommandFrame &out,
                             std::string *reason);
-                            
+
     ReplyFrame buildReplyFrame(uint16_t sequence,
                                uint8_t version,
                                uint8_t apd_bias_status,
@@ -65,8 +66,8 @@ namespace PreprocessUart {
 
     void decodeTemperature(uint16_t temp, uint8_t &low, uint8_t &high);
     float encodeTemperature(uint8_t low, uint8_t high);
-    
+
     void decodeVoltage(float voltage, uint8_t &low, uint8_t &high);
     float encodeVoltage(uint8_t low, uint8_t high);
-        
+
 } // namespace PreprocessUart

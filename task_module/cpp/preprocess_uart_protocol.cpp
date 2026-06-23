@@ -26,6 +26,7 @@ namespace {
     constexpr std::size_t kTempCtlIdx = 17;
     constexpr std::size_t kTestModeIdx = 19;
     constexpr std::size_t kCompleteStatusIdx = 20;
+    constexpr std::size_t kTrackingStatusIdx = 21;
 
     constexpr std::size_t kFcsLowIdx = 26;
     constexpr std::size_t kFcsHighIdx = 27;
@@ -108,8 +109,9 @@ namespace {
         out.distance = readLe16(raw.data() + kDistanceIdx);
         out.velocity = readLe16(raw.data() + kVelocityIdx);
         out.temp_ctl = readLe16(raw.data() + kTempCtlIdx);
-        out.test_mode = raw[kTestModeIdx];                     // 新增测试状态字节
-        out.complete_status = raw[kCompleteStatusIdx];          // 新增完备状态字段
+        out.test_mode = raw[kTestModeIdx];
+        out.complete_status = raw[kCompleteStatusIdx];
+        out.tracking_status = raw[kTrackingStatusIdx];
 
         return true;
     }
@@ -141,14 +143,14 @@ namespace {
         }
 
         writeLe16(reply.raw.data() + 4, sequence);
-        
+
         reply.raw[6] = version;
-        
+
         reply.raw[7] = apd_bias_status;
         reply.raw[8] = ctl_para_status;
         reply.raw[9] = algo_para_status;
         reply.raw[10] = power_status;
-        
+
         reply.raw[11] = temp_low;
         reply.raw[12] = temp_high;
         reply.raw[13] = volt_int;
@@ -159,7 +161,7 @@ namespace {
 
         const uint16_t fcs = calcFrameFcs(reply.raw);
         writeLe16(reply.raw.data() + kFcsLowIdx, fcs);
-        
+
         return reply;
     }
 

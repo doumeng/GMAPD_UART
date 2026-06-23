@@ -47,7 +47,7 @@ namespace PreprocessUart {
             COOLING_SHUTDOWN_WAIT,
             INCOMPLETE
         };
-
+        // 电压状态切换状态机
         enum class ApdPowerState {
             IDLE,
             STARTING_1V8_5V,
@@ -74,8 +74,9 @@ namespace PreprocessUart {
         CompletenessState currentCompletenessState = CompletenessState::IDLE;
         ApdPowerState currentApdState = ApdPowerState::IDLE;
         auto lastApdStateTime = std::chrono::steady_clock::now();
+        std::mutex g_delayMutex;
 
-        // 预处理状态缓存
+        // 通信状态缓存
         struct PreprocessStateCache {
             uint16_t apd_bias = 0;
             uint8_t ctl_para = 0;
@@ -91,6 +92,7 @@ namespace PreprocessUart {
             float temp_value = 0;
             uint8_t received_complete_cmd = 0;
             uint8_t complete_status = 1; // 默认不完备
+            bool manual_delay_applied = false;
 
         };
 
@@ -133,31 +135,23 @@ namespace PreprocessUart {
                 strideLength = 3; // 默认值
             }
 
-            g_histConfig.stride = strideLength;
-
             if (diffThreshold > 0){
                 diffThreshold = std::min(diffThreshold, static_cast<uint8_t>(15)); // 限制最大阈值为15
             } else {
                 diffThreshold = 3; // 默认值
             }
 
-            g_histConfig.threshold = diffThreshold;
-            
             if (constructFrame > 0){
                 constructFrame = std::min(constructFrame, static_cast<uint8_t>(15)); // 限制最大帧数为15
             } else {
                 constructFrame = 5; // 默认值
             }
 
-            g_histConfig.frameNum = constructFrame;
-
             if (denoiseLevel > 0){
                 denoiseLevel = std::min(denoiseLevel, static_cast<uint8_t>(15)); // 限制最大降噪等级为15
             } else {
                 denoiseLevel = 3; // 默认值
             }
-            g_histConfig.denoiseLevel = denoiseLevel;
-
             // 大于0以及值改变则更新
             if (kernalSize > 0){
                 kernalSize = std::min(kernalSize, static_cast<uint8_t>(15)); // 限制最大核大小为10
@@ -165,20 +159,26 @@ namespace PreprocessUart {
                 kernalSize = 3; // 默认值
             }
 
-            g_histConfig.kernalSize = kernalSize;
-            
-            g_histConfig.dbscanEps = denoiseLevel;
-            g_histConfig.dbscanMinSamples = constructFrame;
+            {
+                std::lock_guard<std::mutex> lock(g_histConfig.mtx);
+                g_histConfig.stride = strideLength;
+                g_histConfig.threshold = diffThreshold;
+                g_histConfig.frameNum = constructFrame;
+                g_histConfig.denoiseLevel = denoiseLevel;
+                g_histConfig.kernalSize = kernalSize;
+                g_histConfig.dbscanEps = denoiseLevel;
+                g_histConfig.dbscanMinSamples = constructFrame;
+            }
 
             // 打印算法参数设置结果
             Logger::instance().debug(" PreprocessUart Algorithm Parameters Set");
 
             Logger::instance().debug((" Kernel Size received: " + std::to_string(kernalSize)).c_str());
-            Logger::instance().debug((" Kernel Size setting: " + std::to_string(g_histConfig.kernalSize)).c_str());
+            Logger::instance().debug((" Kernel Size setting: " + std::to_string(kernalSize)).c_str());
             Logger::instance().debug((" Eps received: " + std::to_string(denoiseLevel)).c_str());
-            Logger::instance().debug((" Eps setting: " + std::to_string(g_histConfig.dbscanEps)).c_str());
+            Logger::instance().debug((" Eps setting: " + std::to_string(denoiseLevel)).c_str());
             Logger::instance().debug((" Min Samples received: " + std::to_string(constructFrame)).c_str());
-            Logger::instance().debug((" Min Samples setting: " + std::to_string(g_histConfig.dbscanMinSamples)).c_str());
+            Logger::instance().debug((" Min Samples setting: " + std::to_string(constructFrame)).c_str());
 
             if (StrideLengthCtrl(strideLength)){
                 Logger::instance().error("Failed to set stride length");
@@ -192,17 +192,30 @@ namespace PreprocessUart {
             return status;
         }
 
-        uint8_t DelaySetting(uint16_t distance) {
-            int delay = ComputeDelay(distance, 2, 1000) / 5;
+        bool applyDelayForDistance(float distance) {
+            constexpr float kGateAdvanceDistance = 300.0f;
+            const float gateDistance = std::max(0.0f, distance - kGateAdvanceDistance);
+            const int delay = ComputeDelay(gateDistance, 2, 1000) / 5;
 
-            Logger::instance().info((" PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, ComputedDelay=" + std::to_string(delay) + "ns").c_str());
+            Logger::instance().info(("PreprocessUart Setting delay, TargetDistance=" + std::to_string(distance) + "m, GateDistance=" +
+                    std::to_string(gateDistance) + "m, RegisterDelay=" + std::to_string(delay)).c_str());
 
-            EnDelayCtrl(delay);
-            RecDelayCtrl(delay + 1);
-            {
-                g_sysConfig.enDelay = delay * 5; // 转换回实际延迟值
+            const int enResult = EnDelayCtrl(delay);
+            const int recResult = RecDelayCtrl(delay + 1);
+            if (enResult != 0 || recResult != 0) {
+                Logger::instance().error("PreprocessUart Failed to set APD gate delay");
+                return false;
             }
-            return 0;
+
+            g_sysConfig.enDelay.store(delay * 5); // 转换回实际延迟值
+            return true;
+        }
+
+        void updateDistanceWindow(float distance) {
+            std::lock_guard<std::mutex> lock(g_histConfig.mtx);
+            g_histConfig.distance = distance;
+            g_histConfig.maxDistance = distance + 250.0f;
+            g_histConfig.minDistance = (distance < 250.0f) ? 0.0f : distance - 250.0f;
         }
 
         uint8_t ApdStateSetting(uint8_t ctl_para) {
@@ -272,13 +285,13 @@ namespace PreprocessUart {
                     } else {
                         currentCompletenessState = CompletenessState::COOLING;
                     }
-    
+
                     break;
-                    
+
                 case CompletenessState::COOLING_WAIT:
                     // 等待制冷机温度达到要求
                     Logger::instance().info(("完备状态切换状态机- 等待制冷机温度达到要求 - 当前温度"+ std::to_string(g_stateCache.temp_value/10.0f) + "K, 目标温度"+ std::to_string(g_stateCache.temp_ctl) + "K").c_str());
-                        
+
                     if(g_stateCache.temp_value <= (g_stateCache.temp_ctl*10)) {
                         currentCompletenessState = CompletenessState::DETECTOR;
                         Logger::instance().debug("完备状态切换状态机- 制冷机温度达到要求 - 进入探测器上电状态");
@@ -300,7 +313,7 @@ namespace PreprocessUart {
                     break;
 
                 case CompletenessState::DETECTOR_WAIT:
-                    
+
                     Logger::instance().debug(("完备状态切换状态机- 等待探测器上电完成 - 当前APD状态" + std::to_string(static_cast<int>(currentApdState))).c_str());
                     if (currentApdState == ApdPowerState::STARTING_SUCCESS) {
                         currentCompletenessState = CompletenessState::COMPLETE;
@@ -333,7 +346,7 @@ namespace PreprocessUart {
                     } else {
                         currentCompletenessState = CompletenessState::COOLING_SHUTDOWN;
                     }
-                    
+
                     break;
                 case CompletenessState::COOLING_SHUTDOWN_WAIT:
                     static auto coolingShutdownStartTime = std::chrono::steady_clock::now();
@@ -361,7 +374,7 @@ namespace PreprocessUart {
                         Logger::instance().info("APD上电状态机 - 阶段 1V8_5V");
 
                         SecondVoltageCtrl();
-        
+
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::STARTING_1V8_5V_WAIT;
                     }
@@ -370,7 +383,7 @@ namespace PreprocessUart {
                     if (elapsedMs >= 2000) { // 2s 延时，确保电压稳定
                         Logger::instance().info("APD上电状态机 - 阶段 1V8_5V 等待完成");
                         ApdGatherEn(1);
-                        
+
                         ApdStateSetting(0); // 下发默认参数，开始输出图像
                         g_stateCache.ctl_para = 0;
 
@@ -385,7 +398,7 @@ namespace PreprocessUart {
                         Logger::instance().info("APD上电状态机 - 阶段 30V");
 
                         setHighVoltageStep(30.0f);
-                                  
+
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::STARTING_30V_WAIT;
                     }
@@ -498,7 +511,7 @@ namespace PreprocessUart {
 
                         g_sysConfig.biasVoltage = 10.0f;
                         ApdGatherEn(0);
-                        
+
                         lastApdStateTime = now;
                         currentApdState = ApdPowerState::SHUTDOWN_10V_FINAL_WAIT;
                     }
@@ -512,12 +525,42 @@ namespace PreprocessUart {
                     break;
             }
         }
-        
+
         void handleFullStateFrame(const CommandFrame &cmd) {
 
-            Logger::instance().debug(("PreprocessUart - 测试状态：" + std::to_string(cmd.test_mode) + " 完备状态：" + std::to_string(cmd.complete_status)).c_str());
-                    
-            if (cmd.test_mode == 1)
+            Logger::instance().info(("PreprocessUart - 跟踪状态：" + std::to_string(cmd.tracking_status)).c_str());
+
+            const bool requestedTracking = cmd.tracking_status == 1;
+            bool trackingChanged = false;
+
+            if (cmd.tracking_status == 0){
+                // 非跟踪状态
+                if (!requestedTracking && (trackingChanged || !g_stateCache.manual_delay_applied || cmd.distance != g_stateCache.distance)) {
+                    Logger::instance().info("PreprocessUart - 弹目距离发送");
+                    if (applyDelayForDistance(static_cast<float>(cmd.distance))) {
+                        updateDistanceWindow(static_cast<float>(cmd.distance));
+                        g_stateCache.manual_delay_applied = true;
+                    } else {
+                        g_stateCache.manual_delay_applied = false;
+                    }
+                }
+                g_stateCache.distance = cmd.distance;
+            }else if (cmd.tracking_status == 1)
+            {
+                // 跟踪状态， 不响应弹目距离确定
+                std::lock_guard<std::mutex> delayLock(g_delayMutex);
+                trackingChanged = requestedTracking != g_trackingEnabled.load();
+                if (trackingChanged) {
+                    g_trackingEnabled.store(requestedTracking);
+                    g_trackingGeneration.fetch_add(1);
+                    if (requestedTracking) {
+                        g_stateCache.manual_delay_applied = false;
+                    }
+                    Logger::instance().info(requestedTracking ? "PreprocessUart - Tracking enabled" : "PreprocessUart - Tracking disabled");
+                }
+            }
+
+            if (cmd.test_mode == 1)  // 测试模式，不响应转完备指令
             {
                 if (cmd.power_on_off != g_stateCache.power_on_off) {
                     if (cmd.power_on_off == g_stateCache.last_received_power_on_off) {
@@ -530,7 +573,7 @@ namespace PreprocessUart {
                     if (g_stateCache.power_on_off_count >= 1) {
                         uint8_t cooler_cmd = cmd.power_on_off & 0x01;
                         uint8_t apd_power_cmd = (cmd.power_on_off >> 1) & 0x01;
-                        
+
                         uint8_t last_cooler_cmd = g_stateCache.power_on_off == 0xFF ? 0xFF : (g_stateCache.power_on_off & 0x01);
                         uint8_t last_apd_power_cmd = g_stateCache.power_on_off == 0xFF ? 0xFF : ((g_stateCache.power_on_off >> 1) & 0x01);
 
@@ -553,7 +596,7 @@ namespace PreprocessUart {
                         }
 
                         Logger::instance().debug(("PreprocessUart - 制冷机工作状态:" + std::to_string(g_power_status)).c_str());
-                        
+
                         if (apd_power_cmd != last_apd_power_cmd) {
                             if (apd_power_cmd == 1) {
                                 Logger::instance().debug("PreprocessUart - 探测器上电状态机");
@@ -572,26 +615,26 @@ namespace PreprocessUart {
                         }
 
                         Logger::instance().debug(("PreprocessUart - 电源工作状态:" + std::to_string(g_power_status)).c_str());
-                        
+
                         g_stateCache.power_on_off = cmd.power_on_off;
                         g_stateCache.power_on_off_count = 0; // 执行后重置计数
                     }
-                    } 
+                    }
                 else {
                     g_stateCache.power_on_off_count = 0; // 状态如果已经一致则重置计数
                     g_stateCache.last_received_power_on_off = cmd.power_on_off;
                 }
             }
-            else {
-                if (cmd.complete_status != g_stateCache.received_complete_cmd) 
-                {   
+            else { // 非测试模式，处理完备指令状态机
+                if (cmd.complete_status != g_stateCache.received_complete_cmd)
+                {
 
-                    if (cmd.complete_status == 1) 
+                    if (cmd.complete_status == 1)
                     {
                         Logger::instance().debug("PreprocessUart - 完备指令状态机");
                         currentCompletenessState = CompletenessState::COOLING;
-                    } 
-                    else 
+                    }
+                    else
                     {
                         Logger::instance().debug("PreprocessUart - 低功耗状态机");
                         currentCompletenessState = CompletenessState::DETECTOR_SHUTDOWN;
@@ -605,14 +648,14 @@ namespace PreprocessUart {
             if (cmd.apd_bias != g_stateCache.apd_bias) {
                 float targetVoltage = static_cast<float>(cmd.apd_bias & 0xFF) + (static_cast<float>(cmd.apd_bias >> 8) / 10.0f);
                 float currentVoltage = g_sysConfig.biasVoltage;
-                
+
                 if (std::abs(targetVoltage - currentVoltage) <= 13.0f) {
                     uint16_t spiValue = 0;
                     uint8_t levelValue = 0;
                     float matchedVol = ApdVoltageConfig::getSpiAndLevelByVoltage(targetVoltage, spiValue, levelValue);
-                    
+
                     Logger::instance().info(("PreprocessUart - APD偏压设置, 请求=" + std::to_string(targetVoltage) + "V").c_str());
-                    
+
                     if (HighVoltageCtrl(spiValue, levelValue) == 0) {
                         g_apd_bias_status = 0; // 0x0 成功
                     } else {
@@ -629,16 +672,16 @@ namespace PreprocessUart {
             // 3. APD控制参数 (ctl_para 字节9)
             if (cmd.ctl_para != g_stateCache.ctl_para) {
                 Logger::instance().info("PreprocessUart - APD控制参数设置");
-                
-                g_ctl_para_status = ApdStateSetting(cmd.ctl_para); 
+
+                g_ctl_para_status = ApdStateSetting(cmd.ctl_para);
                 g_stateCache.ctl_para = cmd.ctl_para;
             }
 
             // 4. 算法参数 (字节10-12)
-            if (cmd.algo_frame_denoise != g_stateCache.algo_frame_denoise || 
-                cmd.algo_stride_diff != g_stateCache.algo_stride_diff || 
+            if (cmd.algo_frame_denoise != g_stateCache.algo_frame_denoise ||
+                cmd.algo_stride_diff != g_stateCache.algo_stride_diff ||
                 cmd.algo_kernal != g_stateCache.algo_kernal) {
-                
+
                 Logger::instance().info("PreprocessUart - 算法参数配置");
                 g_algo_para_status = AlgoParaSetting(cmd.algo_frame_denoise, cmd.algo_stride_diff, cmd.algo_kernal);
 
@@ -647,15 +690,8 @@ namespace PreprocessUart {
                 g_stateCache.algo_kernal = cmd.algo_kernal;
             }
 
-            // 5. 延迟设置 (弹目距离 字节14-15)
-            if (cmd.distance != g_stateCache.distance) {
-                Logger::instance().info("PreprocessUart - 弹目距离发送");
-                DelaySetting(cmd.distance);
-                g_stateCache.distance = cmd.distance;
-            }
-
             // 6. 温度控制 (temp_ctl 字节18)
-            if ((cmd.temp_ctl != g_stateCache.temp_ctl) && (cmd.temp_ctl != 0)) { 
+            if ((cmd.temp_ctl != g_stateCache.temp_ctl) && (cmd.temp_ctl != 0)) {
                 // 命令行中 温度控制字和缓存不一致，且温度控制字不为0
                 Logger::instance().info(("PreprocessUart - 温度控制，目标=" + std::to_string(cmd.temp_ctl)).c_str());
                 uint16_t tempRaw = static_cast<uint16_t>(cmd.temp_ctl) * 10; // Cooler期待K为单位
@@ -668,6 +704,25 @@ namespace PreprocessUart {
         }
     } // namespace
 
+    // 更新跟踪得到的距离，并根据需要更新延迟寄存器和距离窗口
+    bool updateTrackingDistance(float distance, bool updateDelay) {
+        if (!std::isfinite(distance) || distance < 0.0f) {
+            Logger::instance().error(
+                    "PreprocessUart Refused invalid tracking distance");
+            return false;
+        }
+        std::lock_guard<std::mutex> delayLock(g_delayMutex);
+        if (!g_trackingEnabled.load()) {
+            return false;
+        }
+        if (updateDelay && !applyDelayForDistance(distance)) {
+            return false;
+        }
+        updateDistanceWindow(distance);
+
+        return true;
+    }
+
     void thread_Uart_Communication(const std::string &devicePath,
                                          uint32_t baudrate,
                                          int periodMs) {
@@ -679,7 +734,7 @@ namespace PreprocessUart {
             return;
         }
 
-        g_stateCache.temp_ctl = Cooler::getTargetTemp() / 10; // 转换回协议中的温度值   
+        g_stateCache.temp_ctl = Cooler::getTargetTemp() / 10; // 转换回协议中的温度值
         Logger::instance().info(("Cooler target temperature: " + std::to_string(g_stateCache.temp_ctl) + " K").c_str());
 
         uint32_t txSequence = 1;
@@ -717,7 +772,7 @@ namespace PreprocessUart {
             decodeTemperature(g_stateCache.temp_value, coolerTempLow, coolerTempHigh);
 
             Logger::instance().debug(("PreprocessUart Cooler Temperature: " + std::to_string(static_cast<float>(g_stateCache.temp_value) / 10.0f) + "K").c_str());
-            
+
 
             uint16_t fpgaTemp = static_cast<uint16_t>(std::lround(fpga_temp_dev.getAdc() / 100.0f)); // FPGA温度除以1000得到原始温度，此处除以100是为了保持统一的协议，传输数值为原始温度乘以10；
             decodeTemperature(fpgaTemp, fpgaTempLow, fpgaTempHigh);
@@ -729,26 +784,26 @@ namespace PreprocessUart {
             uint8_t version = generateVersionNumber(major_version, minor_version);
 
             uint8_t current_power_status = g_power_status;
-            
+
             if (currentApdState >= ApdPowerState::STARTING_1V8_5V && currentApdState <= ApdPowerState::STARTING_58V) {
                 current_power_status &= ~0x02; // 启动中对应下电标记清除
             }
 
-            ReplyFrame reply = buildReplyFrame(txSequence++, 
-                                               version, 
-                                               g_apd_bias_status, 
-                                               g_ctl_para_status, 
-                                               g_algo_para_status, 
-                                               current_power_status, 
-                                               coolerTempLow, coolerTempHigh, 
+            ReplyFrame reply = buildReplyFrame(txSequence++,
+                                               version,
+                                               g_apd_bias_status,
+                                               g_ctl_para_status,
+                                               g_algo_para_status,
+                                               current_power_status,
+                                               coolerTempLow, coolerTempHigh,
                                                voltLow, voltHigh,
                                                fpgaTempLow, fpgaTempHigh,
                                                g_stateCache.complete_status);
-                                               
+
             std::vector<uint8_t> txData(reply.raw.begin(), reply.raw.end());
-            
+
             Logger::instance().debug(("PreprocessUart Sending reply frame: \n" + frameToHex(reply.raw)).c_str());
-           
+
             SerialUtils::write_frame(serial, txData);
 
             // 4. 严格同步到周期
