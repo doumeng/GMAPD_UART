@@ -218,6 +218,27 @@ namespace PreprocessUart {
             g_histConfig.minDistance = (distance < 250.0f) ? 0.0f : distance - 250.0f;
         }
 
+        std::size_t calculateTrackingRoiSize(float distance) {
+            constexpr std::size_t kTrackingRoiMinSize = 4;
+            constexpr std::size_t kTrackingRoiMaxSize = 32;
+            constexpr float kTrackingRoiNearDistance = 1000.0f;
+            constexpr float kTrackingRoiFarDistance = 3000.0f;
+
+            if (distance <= kTrackingRoiNearDistance) {
+                return kTrackingRoiMaxSize;
+            }
+            if (distance >= kTrackingRoiFarDistance) {
+                return kTrackingRoiMinSize;
+            }
+
+            const float distanceRatio = (distance - kTrackingRoiNearDistance) /
+                                        (kTrackingRoiFarDistance - kTrackingRoiNearDistance);
+            const float roiSize = static_cast<float>(kTrackingRoiMaxSize) -
+                                  distanceRatio * static_cast<float>(kTrackingRoiMaxSize - kTrackingRoiMinSize);
+
+            return static_cast<std::size_t>(std::lround(roiSize));
+        }
+
         uint8_t ApdStateSetting(uint8_t ctl_para) {
             uint8_t triggerMode = ctl_para & 0x01; // 低1位
             uint8_t testPoint = (ctl_para >> 1) & 0x01; // 第2位
@@ -726,6 +747,7 @@ namespace PreprocessUart {
             return false;
         }
         updateDistanceWindow(distance);
+        g_trackingRoiSize.store(calculateTrackingRoiSize(distance));
 
         return true;
     }
