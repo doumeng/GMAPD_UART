@@ -33,6 +33,7 @@
 #include "cooler_control.h"
 #include "log.h"
 #include "depth_process.h"
+#include "laser_energy_process.h"
 #include "tof_process.h"
 #include "preprocess_uart_slave.h"
 #include "uart_read.h"
@@ -49,12 +50,9 @@ LatestRingBuffer<UdpDataPacket, kPacketBufferSize> g_udpRing;
 std::mutex g_udpMutex;
 std::condition_variable g_udpCV;
 
-DistanceFrameShared g_distanceFrameShared;
-std::mutex g_distanceFrameMutex;
-std::condition_variable g_distanceFrameCV;
-std::atomic_bool g_trackingEnabled{false};
-std::atomic<std::uint64_t> g_trackingGeneration{0};
-std::atomic<std::size_t> g_trackingRoiSize{32};
+LaserFrameShared g_laserFrameShared;
+std::mutex g_laserFrameMutex;
+std::condition_variable g_laserFrameCV;
 
 // 系统参数
 UartComm::SystemConfig g_sysConfig;
@@ -64,20 +62,23 @@ UartComm::HistConfig g_histConfig;
 void register_threads()
 {
     Logger::instance().info("Registering and starting threads");
-
-    std::string coolerDevicePath = "/dev/ttyS2";
+    
+    std::string coolerDevicePath = "/dev/ttyS2"; 
     Cooler::initCooler(coolerDevicePath, 4800);
 
     std::string devicePath = "/dev/ttyS3";
-    std::thread uartComm(PreprocessUart::thread_Uart_Communication,
-                         devicePath,  115200,  200);
+    std::thread uartComm(PreprocessUart::thread_Uart_Communication, 
+                         devicePath,  115200,  200);              
     uartComm.detach();
-
+    
     std::thread udpSend(UdpComm::thread_UdpSend);
     udpSend.detach();
 
     std::thread depthProcess(PointCloud::thread_PointCloudProcess);
     depthProcess.detach();
+
+    std::thread laserEnergyProcess(LaserEnergy::thread_LaserEnergyProcess);
+    laserEnergyProcess.detach();
 
     std::thread tofProcess(TofProcesser::thread_TofProcess);
     tofProcess.detach();

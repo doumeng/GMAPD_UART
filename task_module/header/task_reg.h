@@ -13,7 +13,6 @@
 #include <atomic>
 #include <array>
 #include <condition_variable>
-#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <shared_mutex>
@@ -33,11 +32,12 @@ extern LatestRingBuffer<UdpDataPacket, 5> g_udpRing;
 extern std::mutex g_udpMutex;
 extern std::condition_variable g_udpCV;
 
-struct DistanceFrameShared {
+struct LaserFrameShared {
 	static constexpr std::size_t kRows = 128;
 	static constexpr std::size_t kCols = 128;
 	static constexpr std::size_t kPixelCount = kRows * kCols;
 
+	std::array<uint16_t, kPixelCount> inten{};
 	std::array<float, kPixelCount> dist{};
 	int rows = static_cast<int>(kRows);
 	int cols = static_cast<int>(kCols);
@@ -45,12 +45,9 @@ struct DistanceFrameShared {
 	bool valid = false;
 };
 
-extern DistanceFrameShared g_distanceFrameShared;
-extern std::mutex g_distanceFrameMutex;
-extern std::condition_variable g_distanceFrameCV;
-extern std::atomic_bool g_trackingEnabled;
-extern std::atomic<std::uint64_t> g_trackingGeneration;
-extern std::atomic<std::size_t> g_trackingRoiSize;
+extern LaserFrameShared g_laserFrameShared;
+extern std::mutex g_laserFrameMutex;
+extern std::condition_variable g_laserFrameCV;
 
 extern UdpComm::UdpSender udp_Sender;
 

@@ -34,6 +34,10 @@ void initTemperatureSensors() {
 
 // 根据距离，计算需要的延迟时间
 int ComputeDelay(float TargetDistance, int BinWidth, int Gatecount) {
-    int delay = TargetDistance / 0.15f ;
-    return delay;
+    int bincount = (TargetDistance * 2) / (0.3 * BinWidth); // 计算需要的bin数
+    int timeDelay = bincount - (bincount % Gatecount); // 计算实际延迟bin数
+    return timeDelay * 2;
+ 
+    // int delay = TargetDistance / 0.15f ;
+    // return delay;
 }

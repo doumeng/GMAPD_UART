@@ -8,6 +8,3 @@ include/
 build/
 .idea/
 .vscode/
-.codex/
-.agents/
-AGENTS.md

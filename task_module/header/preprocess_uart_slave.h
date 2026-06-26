@@ -14,8 +14,6 @@
 
 namespace PreprocessUart {
 
-    bool updateTrackingDistance(float distance, bool updateDelay);
-
     /**
      * @brief 预处理通信线程入口函数
      * 周期行为：先发送上一周期待回指令（无则0），再等待并解析本周期上行指令。
@@ -25,7 +23,7 @@ namespace PreprocessUart {
      * @param baudrate 波特率，默认 115200
      * @param periodMs 周期时间，默认 20ms
      */
-
+    
     void thread_Uart_Communication(const std::string &devicePath,
                                          uint32_t baudrate = 115200,
                                          int periodMs = 20);

@@ -8,7 +8,6 @@
 */
 
 #pragma once
-#include <atomic>
 #include <mutex>
 #include <cstdint>
 #include <cstddef>
@@ -39,7 +38,9 @@ namespace UartComm {
         TriggerMode triggerMode = TriggerMode::EXTERNAL; // 探测器触发模式
         float timeResolution = 2.0f;                     // 时间分辨率(ns)
         float biasVoltage = 0.0f;                        // 电压(V)
-        std::atomic<int32_t> enDelay{0};                 // 开门延迟（ns）
+        int16_t enDelay = 0;                             // 开门延迟（ns）
+        uint8_t laserGear = 0;                           // 激光挡位(0-3)
+        float laserEnergy = 0.0f;                        // 激光能量(占位值)
     };
 
     struct HistConfig
@@ -61,7 +62,7 @@ namespace UartComm {
         float distance = 0.0f;
         float minDistance = 0.0f;                         // 最小距离(m)
         float maxDistance = 6000.0f;                      // 最大距离(m)
-
+        
         float dbscanEps = 3.0f;                           // DBSCAN 邻域半径
         uint16_t dbscanMinSamples = 5;                    // DBSCAN 最小样本数
     };
