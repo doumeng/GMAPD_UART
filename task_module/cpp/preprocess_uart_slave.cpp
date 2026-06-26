@@ -214,8 +214,29 @@ namespace PreprocessUart {
         void updateDistanceWindow(float distance) {
             std::lock_guard<std::mutex> lock(g_histConfig.mtx);
             g_histConfig.distance = distance;
-            g_histConfig.maxDistance = distance + 250.0f;
+            g_histConfig.maxDistance = distance + 500.0f;
             g_histConfig.minDistance = (distance < 250.0f) ? 0.0f : distance - 250.0f;
+        }
+
+        std::size_t calculateTrackingRoiSize(float distance) {
+            constexpr std::size_t kTrackingRoiMinSize = 4;
+            constexpr std::size_t kTrackingRoiMaxSize = 32;
+            constexpr float kTrackingRoiNearDistance = 1000.0f;
+            constexpr float kTrackingRoiFarDistance = 3000.0f;
+
+            if (distance <= kTrackingRoiNearDistance) {
+                return kTrackingRoiMaxSize;
+            }
+            if (distance >= kTrackingRoiFarDistance) {
+                return kTrackingRoiMinSize;
+            }
+
+            const float distanceRatio = (distance - kTrackingRoiNearDistance) /
+                                        (kTrackingRoiFarDistance - kTrackingRoiNearDistance);
+            const float roiSize = static_cast<float>(kTrackingRoiMaxSize) -
+                                  distanceRatio * static_cast<float>(kTrackingRoiMaxSize - kTrackingRoiMinSize);
+
+            return static_cast<std::size_t>(std::lround(roiSize));
         }
 
         uint8_t ApdStateSetting(uint8_t ctl_para) {
@@ -528,37 +549,45 @@ namespace PreprocessUart {
 
         void handleFullStateFrame(const CommandFrame &cmd) {
 
-            Logger::instance().info(("PreprocessUart - 跟踪状态：" + std::to_string(cmd.tracking_status)).c_str());
-
-            const bool requestedTracking = cmd.tracking_status == 1;
-            bool trackingChanged = false;
-
-            if (cmd.tracking_status == 0){
-                // 非跟踪状态
-                if (!requestedTracking && (trackingChanged || !g_stateCache.manual_delay_applied || cmd.distance != g_stateCache.distance)) {
-                    Logger::instance().info("PreprocessUart - 弹目距离发送");
-                    if (applyDelayForDistance(static_cast<float>(cmd.distance))) {
-                        updateDistanceWindow(static_cast<float>(cmd.distance));
-                        g_stateCache.manual_delay_applied = true;
-                    } else {
-                        g_stateCache.manual_delay_applied = false;
-                    }
-                }
-                g_stateCache.distance = cmd.distance;
-            }else if (cmd.tracking_status == 1)
+            // 跟踪状态处理
             {
-                // 跟踪状态， 不响应弹目距离确定
-                std::lock_guard<std::mutex> delayLock(g_delayMutex);
-                trackingChanged = requestedTracking != g_trackingEnabled.load();
-                if (trackingChanged) {
-                    g_trackingEnabled.store(requestedTracking);
-                    g_trackingGeneration.fetch_add(1);
-                    if (requestedTracking) {
-                        g_stateCache.manual_delay_applied = false;
+                Logger::instance().info(("PreprocessUart - 跟踪状态：" + std::to_string(cmd.tracking_status)).c_str());
+
+                const bool definedTrackingStatus = isDefinedTrackingStatus(cmd.tracking_status);
+                const bool requestedTracking = trackingStatusUsesAutomaticDelay(cmd.tracking_status);
+                const bool requestedManualDelay = !definedTrackingStatus || trackingStatusUsesManualDelay(cmd.tracking_status);
+
+                if (!definedTrackingStatus) {
+                    Logger::instance().warning(("PreprocessUart - Undefined tracking status " + std::to_string(cmd.tracking_status) + ", falling back to manual delay").c_str());
+                }
+
+                {
+                    std::lock_guard<std::mutex> delayLock(g_delayMutex);
+                    const bool trackingChanged = requestedTracking != g_trackingEnabled.load();
+
+                    if (trackingChanged) {
+                        g_trackingEnabled.store(requestedTracking);
+                        g_trackingGeneration.fetch_add(1);
+                        Logger::instance().info(requestedTracking ? "PreprocessUart - Tracking enabled" : "PreprocessUart - Tracking disabled");
                     }
-                    Logger::instance().info(requestedTracking ? "PreprocessUart - Tracking enabled" : "PreprocessUart - Tracking disabled");
+
+                    if (requestedTracking) {
+                        if (trackingChanged) { g_stateCache.manual_delay_applied = false; }
+                    } else if (requestedManualDelay && (trackingChanged || !g_stateCache.manual_delay_applied || cmd.distance != g_stateCache.distance)) {
+                        Logger::instance().info("PreprocessUart - 弹目距离发送");
+                        if (applyDelayForDistance(static_cast<float>(cmd.distance))) {
+                            updateDistanceWindow(static_cast<float>(cmd.distance));
+                            g_stateCache.manual_delay_applied = true;
+                            g_stateCache.distance = cmd.distance;
+                        } else {
+                            g_stateCache.manual_delay_applied = false;
+                        }
+                    } else if (!requestedManualDelay) {
+                        Logger::instance().info("PreprocessUart - Tracking failed, keeping previous delay settings");
+                    }
                 }
             }
+
 
             if (cmd.test_mode == 1)  // 测试模式，不响应转完备指令
             {
@@ -707,8 +736,7 @@ namespace PreprocessUart {
     // 更新跟踪得到的距离，并根据需要更新延迟寄存器和距离窗口
     bool updateTrackingDistance(float distance, bool updateDelay) {
         if (!std::isfinite(distance) || distance < 0.0f) {
-            Logger::instance().error(
-                    "PreprocessUart Refused invalid tracking distance");
+            Logger::instance().error("PreprocessUart Refused invalid tracking distance");
             return false;
         }
         std::lock_guard<std::mutex> delayLock(g_delayMutex);
@@ -719,6 +747,7 @@ namespace PreprocessUart {
             return false;
         }
         updateDistanceWindow(distance);
+        g_trackingRoiSize.store(calculateTrackingRoiSize(distance));
 
         return true;
     }
@@ -749,10 +778,11 @@ namespace PreprocessUart {
             if (rxData.size() == kFrameSize) {
                 std::array<uint8_t, kFrameSize> rxArray;
                 std::copy(rxData.begin(), rxData.end(), rxArray.begin());
-                Logger::instance().debug(("PreprocessUart Received frame: \n" + frameToHex(rxArray)).c_str());
+                Logger::instance().info(("PreprocessUart Received frame: \n" + frameToHex(rxArray)).c_str());
 
                 CommandFrame cmdFrame;
                 std::string reason;
+
                 if (decodeCommandFrame(rxArray, cmdFrame, &reason)) {
                     handleFullStateFrame(cmdFrame);
                 } else {

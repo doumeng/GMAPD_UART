@@ -26,10 +26,9 @@ namespace TofProcesser {
 
     namespace {
 
-        constexpr std::size_t kTrackingRoiSize = 16;
-        constexpr float kDelayUpdateDistanceThreshold = 300.0f;
-        constexpr auto kModePollInterval = std::chrono::milliseconds(200);
-        constexpr auto kFrameWaitTimeout = std::chrono::milliseconds(100);
+        constexpr float kDelayUpdateDistanceThreshold = 100.0f;
+        constexpr auto kComputeInterval = std::chrono::milliseconds(500);
+        constexpr auto kFrameWaitTimeout = std::chrono::milliseconds(200);
 
     } // namespace
 
@@ -98,6 +97,7 @@ namespace TofProcesser {
         bool hasAppliedTrackingDistance = false;
 
         while (1) {
+
             if (g_sysConfig.workMode == UartComm::WorkMode::TEST)
             {
                 // 测试模式发送原始数据
@@ -107,71 +107,78 @@ namespace TofProcesser {
                 trackingGeneration = g_trackingGeneration.load();
 
                 img::ImgMod tofImg = img::imgRead(tofImgChnAttr);
-                if (tofImg.isEmptyFrame()) {
-                    continue;
-                }
+                if (!tofImg.isEmptyFrame()) {
+                    UdpDataPacket packet;
+                    packet.data.resize(kFrameBytes);
+                    packet.type = UdpPacketType::TOF_IMAGE;
+                    std::memcpy(packet.data.data(), tofImg.ptr(), kFrameBytes);
 
-                UdpDataPacket packet;
-                packet.data.resize(kFrameBytes);
-                packet.type = UdpPacketType::TOF_IMAGE;
-                std::memcpy(packet.data.data(), tofImg.ptr(), kFrameBytes);
-
-                {
-                    std::lock_guard<std::mutex> lock(g_udpMutex);
-                    g_udpRing.push(std::move(packet));
+                    {
+                        std::lock_guard<std::mutex> lock(g_udpMutex);
+                        g_udpRing.push(std::move(packet));
+                    }
+                    g_udpCV.notify_one();
                 }
-                g_udpCV.notify_one();
-                continue;
             }
             // 标准模式测距+跟踪
-            else if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD) {
+            else if (g_sysConfig.workMode == UartComm::WorkMode::STANDARD)
+            {
+                auto start_time = std::chrono::steady_clock::now();
+
                 if (!g_trackingEnabled.load()) {
                     hasAppliedTrackingDistance = false;
                     trackingGeneration = g_trackingGeneration.load();
-                    std::this_thread::sleep_for(kModePollInterval);
-                    continue;
+                } else {
+                    const uint64_t currentTrackingGeneration = g_trackingGeneration.load();
+                    if (currentTrackingGeneration != trackingGeneration) {
+                        trackingGeneration = currentTrackingGeneration;
+                        hasAppliedTrackingDistance = false;
+                    }
+
+                    DistanceFrameShared localFrame;
+                    bool hasNewFrame = false;
+                    {
+                        std::unique_lock<std::mutex> lock(g_distanceFrameMutex);
+                        g_distanceFrameCV.wait_for(lock, kFrameWaitTimeout, [&] {
+                            return g_distanceFrameShared.valid && g_distanceFrameShared.frameSeq != lastFrameSequence;
+                        });
+
+                        if (g_distanceFrameShared.valid && g_distanceFrameShared.frameSeq != lastFrameSequence) {
+                            localFrame = g_distanceFrameShared;
+                            lastFrameSequence = localFrame.frameSeq;
+                            hasNewFrame = true;
+                        }
+                    }
+
+                    if (hasNewFrame) {
+                        float targetDistance = 0.0f;
+                        const std::size_t trackingRoiSize = g_trackingRoiSize.load();
+                        if (calculateMedianDistance(localFrame.dist.data(), localFrame.dist.size(), localFrame.rows, localFrame.cols, trackingRoiSize, targetDistance)) {
+                            const bool shouldUpdateDelay = !hasAppliedTrackingDistance || std::fabs(targetDistance - lastAppliedDistance) >= kDelayUpdateDistanceThreshold;
+
+                            if (PreprocessUart::updateTrackingDistance(targetDistance, shouldUpdateDelay)) {
+                                if (shouldUpdateDelay) {
+                                    lastAppliedDistance = targetDistance;
+                                    hasAppliedTrackingDistance = true;
+                                }
+                            }
+
+                            Logger::instance().info(("Thread TofProcess - Tracking distance: " + std::to_string(targetDistance) +
+                                                     "m, ROI size: " + std::to_string(trackingRoiSize) +
+                                                     ", lastAppliedDistance: " + std::to_string(lastAppliedDistance) + "m, shouldUpdateDelay: " + std::to_string(shouldUpdateDelay)).c_str());
+                        } else {
+                            Logger::instance().debug("Thread TofProcess - No valid distance in tracking ROI");
+                        }
+                    }
                 }
 
-                const uint64_t currentTrackingGeneration = g_trackingGeneration.load();
-                if (currentTrackingGeneration != trackingGeneration) {
-                    trackingGeneration = currentTrackingGeneration;
-                    hasAppliedTrackingDistance = false;
-                }
-
-                DistanceFrameShared localFrame;
+                auto computationTime = std::chrono::steady_clock::now() - start_time;
+                if (computationTime < kComputeInterval)
                 {
-                    std::unique_lock<std::mutex> lock(g_distanceFrameMutex);
-                    g_distanceFrameCV.wait_for(lock, kFrameWaitTimeout, [&] {
-                        return g_distanceFrameShared.valid && g_distanceFrameShared.frameSeq != lastFrameSequence;
-                    });
-
-                    if (!g_distanceFrameShared.valid || g_distanceFrameShared.frameSeq == lastFrameSequence) {
-                        continue;
-                    }
-
-                    localFrame = g_distanceFrameShared;
-                    lastFrameSequence = localFrame.frameSeq;
+                    std::this_thread::sleep_for(kComputeInterval - computationTime);
                 }
-
-                float targetDistance = 0.0f;
-                if (!calculateMedianDistance(localFrame.dist.data(),localFrame.dist.size(), localFrame.rows,localFrame.cols, kTrackingRoiSize,targetDistance)) {
-                    Logger::instance().debug("Thread TofProcess - No valid distance in tracking ROI");
-                    continue;
-                }
-
-                const bool shouldUpdateDelay =!hasAppliedTrackingDistance || std::fabs(targetDistance - lastAppliedDistance) >= kDelayUpdateDistanceThreshold;
-
-                if (PreprocessUart::updateTrackingDistance(targetDistance, shouldUpdateDelay)) {
-                    if (shouldUpdateDelay) {
-                        lastAppliedDistance = targetDistance;
-                        hasAppliedTrackingDistance = true;
-                    }
-                }
-
-                Logger::instance().info(("Thread TofProcess - Tracking distance: " + std::to_string(targetDistance) + "m").c_str());
             }
         }
-
     }
 
 } // namespace TofProcesser

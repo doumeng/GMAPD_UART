@@ -69,6 +69,21 @@ namespace {
         return calcFcs16(frame.data() + 4, 22);
     }
 
+    bool isDefinedTrackingStatus(uint8_t trackingStatus) {
+        return trackingStatus == 0 ||
+               trackingStatus == 2 ||
+               trackingStatus == 3 ||
+               trackingStatus == 4;
+    }
+
+    bool trackingStatusUsesAutomaticDelay(uint8_t trackingStatus) {
+        return trackingStatus == 2 || trackingStatus == 3;
+    }
+
+    bool trackingStatusUsesManualDelay(uint8_t trackingStatus) {
+        return trackingStatus == 0;
+    }
+
     bool decodeCommandFrame(const std::array<uint8_t, kFrameSize> &raw,
                             CommandFrame &out,
                             std::string *reason) {

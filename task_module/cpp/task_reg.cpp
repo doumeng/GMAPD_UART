@@ -54,6 +54,7 @@ std::mutex g_distanceFrameMutex;
 std::condition_variable g_distanceFrameCV;
 std::atomic_bool g_trackingEnabled{false};
 std::atomic<std::uint64_t> g_trackingGeneration{0};
+std::atomic<std::size_t> g_trackingRoiSize{32};
 
 // 系统参数
 UartComm::SystemConfig g_sysConfig;

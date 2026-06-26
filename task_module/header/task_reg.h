@@ -13,6 +13,7 @@
 #include <atomic>
 #include <array>
 #include <condition_variable>
+#include <cstddef>
 #include <cstdint>
 #include <mutex>
 #include <shared_mutex>
@@ -49,6 +50,7 @@ extern std::mutex g_distanceFrameMutex;
 extern std::condition_variable g_distanceFrameCV;
 extern std::atomic_bool g_trackingEnabled;
 extern std::atomic<std::uint64_t> g_trackingGeneration;
+extern std::atomic<std::size_t> g_trackingRoiSize;
 
 extern UdpComm::UdpSender udp_Sender;
 

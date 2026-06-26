@@ -34,7 +34,7 @@ namespace PreprocessUart {
         uint16_t temp_ctl = 0;          // 18-19 (Idx 17-18)
         uint8_t test_mode = 0;          // 20  (Idx 19) - 0：测试指令无效 1：测试指令有效，响应完备以及低功耗指令
         uint8_t complete_status = 0;       // 21 (Idx 20) - 0：低功耗 1：完备
-        uint8_t tracking_status = 0;     // 22 (Idx 21) - 0：未跟踪 1：跟踪
+        uint8_t tracking_status = 0;     // 22 (Idx 21) - 0：未跟踪 2/3：跟踪成功 4：跟踪失败
     };
 
     struct ReplyFrame {
@@ -47,6 +47,10 @@ namespace PreprocessUart {
     bool decodeCommandFrame(const std::array<uint8_t, kFrameSize> &raw,
                             CommandFrame &out,
                             std::string *reason);
+
+    bool isDefinedTrackingStatus(uint8_t trackingStatus);
+    bool trackingStatusUsesAutomaticDelay(uint8_t trackingStatus);
+    bool trackingStatusUsesManualDelay(uint8_t trackingStatus);
 
     ReplyFrame buildReplyFrame(uint16_t sequence,
                                uint8_t version,

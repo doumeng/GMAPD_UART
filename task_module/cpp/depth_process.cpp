@@ -290,22 +290,22 @@ namespace PointCloud {
                                  distIn.rows, distIn.cols, 64);
         }else{
             // 非模拟器场景
-            // FillHolesDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
-            //                        reinterpret_cast<uint16_t*>(intenOut.data),
-            //                        intenIn.rows, intenIn.cols, kSize);
-
-            // FillHolesDilate<float>(reinterpret_cast<const float*>(distIn.data),
-            //                        reinterpret_cast<float*>(distOut.data),
-            //                        distIn.rows, distIn.cols, kSize);
-
-            // 模拟器场景
-            FillHolesErodeAndDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
+            FillHolesDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
                                    reinterpret_cast<uint16_t*>(intenOut.data),
                                    intenIn.rows, intenIn.cols, kSize);
 
-            FillHolesErodeAndDilate<float>(reinterpret_cast<const float*>(distIn.data),
+            FillHolesDilate<float>(reinterpret_cast<const float*>(distIn.data),
                                    reinterpret_cast<float*>(distOut.data),
                                    distIn.rows, distIn.cols, kSize);
+
+            // 模拟器场景
+            // FillHolesErodeAndDilate<uint16_t>(reinterpret_cast<const uint16_t*>(intenIn.data),
+            //                        reinterpret_cast<uint16_t*>(intenOut.data),
+            //                        intenIn.rows, intenIn.cols, kSize);
+
+            // FillHolesErodeAndDilate<float>(reinterpret_cast<const float*>(distIn.data),
+            //                        reinterpret_cast<float*>(distOut.data),
+            //                        distIn.rows, distIn.cols, kSize);
         }
     }
 
@@ -370,7 +370,7 @@ namespace PointCloud {
         }
 
         if (g_trackingEnabled.load()) {
-            Logger::instance().debug(("Thread PointCloudProcess - Tracking enabled, denoiseByDistance: " + std::to_string(minDistance) + "m to "+ std::to_string(maxDistance) + "m").c_str());
+            Logger::instance().info(("Thread PointCloudProcess - Tracking enabled, denoiseByDistance: " + std::to_string(minDistance) + "m to "+ std::to_string(maxDistance) + "m").c_str());
             denoiseByDistance(intenMat, distMat, minDistance, maxDistance);
         }
 
