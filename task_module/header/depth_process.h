@@ -24,7 +24,7 @@
 namespace PointCloud {
 
     // 1. 解析原始数据中的强度和距离，并将飞行时间转换为距离
-    void parseDepthData(const uint32_t* rawData, int rows, int cols, int16_t offset,
+    void parseDepthData(const uint32_t* rawData, int rows, int cols, int32_t offset,
                         cv::Mat& intenMat, cv::Mat& distMat);
 
     // 2. 根据强度阈值对强度图和距离图进行降噪（低于阈值的像素清零）
@@ -45,7 +45,7 @@ namespace PointCloud {
                          int rows, int cols, UdpDataPacket& udpPkt);
 
     // 完整处理流水线：解析并进行降噪
-    void processDenoisedDepthImage(const uint32_t* rawData, int rows, int cols, int16_t offset, UdpDataPacket& udpPkt);
+    void processDenoisedDepthImage(const uint32_t* rawData, int rows, int cols, int32_t offset, UdpDataPacket& udpPkt);
 
     void thread_PointCloudProcess();
 

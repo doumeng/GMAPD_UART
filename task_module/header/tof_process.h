@@ -8,33 +8,14 @@
  */
 #pragma once
 
-#include <vector>
-#include <cstring>
-#include <memory>
-#include <tuple>
-#include <thread>
-
-
-#include "log.h"
-#include "task_reg.h"
-#include "img.h"
-#include "preprocess_uart_slave.h"
+#include <cstddef>
 
 namespace TofProcesser {
-    // 直方图统计结果结构体
-    // struct HistogramResult {
-    //     int maxPixelValue;  // 出现频数最高的像素值
-    //     int maxFrequency;   // 该像素值出现的次数
-    //     float occupancyRatio; // 非零像元比例
-    // };
-
-    // HistogramResult ComputeHistogram(
-    //     const cv::Mat& image, 
-    //     int startValue, 
-    //     int endValue);
-
-    // 计算TOF场景距离(返回m)
-    float calculateDistanceFromTof(const uint16_t* tofData, size_t numPixels, int startValue = 200, int endValue = 7800, int binWidth = 10);
-        
+    bool calculateMedianDistance(const float *distanceData,
+                                 std::size_t distanceCount,
+                                 int rows,
+                                 int cols,
+                                 std::size_t roiSize,
+                                 float &targetDistance);
     void thread_TofProcess();
 }
